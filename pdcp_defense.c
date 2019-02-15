@@ -32,9 +32,6 @@
 #include "socket_msg.h"
 #include "pdcp_defense.h"
 
-#define SEC_TO_MILI  1000
-#define NANO_TO_MILI 0.000001
-
 
 extern _tSchedBuffer activeRequests[MAX_NO_CONN_TO_PDCP];
 
@@ -42,20 +39,33 @@ int cpu_avail, down_bw_avail, up_bw_avail;
 
 
 //This function calculates the priority of a bearer based on E2E time delay budget according to 5QI table and elapsed time at pdcp
-double get_time_prio(int qci_val, struct timespec bufferRecTime)
+double get_time_prio(int index)
 {
+	int noBuffer;
 	struct timespec curr_time;
 	clock_gettime(CLOCK_MONOTONIC, &curr_time);
+	double temp_elapse_time = 0, elapse_time = 0;
+	for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
+	{
+		if (activeRequests[index].sockBufferDatabase[noBuffer].isBufferUsed == true)
+		{
+			elapse_time = (double)(curr_time.tv_sec - activeRequests[index].sockBufferDatabase[noBuffer].bufferRecTime.tv_sec)*SEC_TO_MILI +
+						(double)(curr_time.tv_nsec - activeRequests[index].sockBufferDatabase[noBuffer].bufferRecTime.tv_nsec) * NANO_TO_MILI;
 
-	double elapse_time = (double)(curr_time.tv_sec - bufferRecTime.tv_sec)*SEC_TO_MILI +
-			(double)(curr_time.tv_nsec - bufferRecTime.tv_nsec) * NANO_TO_MILI;
+			if (temp_elapse_time < elapse_time)
+			{
+				temp_elapse_time = elapse_time;
+			}
+		}
+	}
+
 	int i;
 	for (i = 0; i<INDEX; i++)
 	{
-		if (qci_5g_value[i] == qci_val)
+		if (qci_5g_value[i] == activeRequests[index].qci)
 		{
 
-			double time_prio = (elapse_time) / (double) qci_delay[i];
+			double time_prio = (temp_elapse_time) / (double) qci_delay[i];
 			return time_prio;
 		}
 	}
@@ -80,20 +90,41 @@ double get_qci_prio (int qci)
 	return -1.0;
 }
 
+double get_unprocessed_bytes_prio (int index)
+{
+	int noBuffer;
+	long int unP_byte = 0;
+	for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
+	{
+		if (activeRequests[index].sockBufferDatabase[noBuffer].isBufferUsed)
+		{
+			unP_byte += (int) (((PDCP_DATA_REQ_FUNC_T*)activeRequests[index].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
+		}
+	}
+
+	double prio_calc = (double) (unP_byte / MAX_BUFFER_PER_BEARER);
+	return prio_calc;
+}
+
+double get_uti_prio (int index)
+{
+	double utilization_prio = 0;
+	int cpu_capacity = MAX_CPU_CAPACITY;
+	utilization_prio = (double) (activeRequests[index].total_bytes_rec / cpu_capacity);
+
+	return utilization_prio;
+}
+
 int defense ()
 {
 	//First we need to prioritize all the bearers
 	int noConnect, noBuffer;
 	for (noConnect = 0; noConnect < MAX_NO_CONN_TO_PDCP; noConnect++)
 	{
-		for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
-		{
-			if (activeRequests[noConnect].sockBufferDatabase[noBuffer].isBufferUsed == true)
-			{
-				double timing_prio = get_time_prio(activeRequests[noConnect].qci, activeRequests[noConnect].bufferRecTime);
-				double qci_prio = get_qci_prio (activeRequests[noConnect].qci);
-			}
-		}
+		double timing_prio = get_time_prio(noConnect);
+		double qci_prio = get_qci_prio (activeRequests[noConnect].qci);
+		double unscheduling_prio = get_unprocessed_bytes_prio (noConnect);
+		double utilization_prio = get_uti_prio (noConnect);
 	}
 
 	return 0;

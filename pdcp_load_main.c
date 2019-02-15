@@ -42,6 +42,9 @@
 //#include "collec_dec_pdcp.h"
 #include "socket_msg.h"
 
+
+#define PDCP_MONITOR_WINDOW 5
+
 //conn_info connInfo[MAX_NO_CONN_TO_PDCP];
 
 //******************************************************************************
@@ -117,7 +120,8 @@ void 	init_connection ()
 	{
 		for (n=0; n<MAX_BUFFER_REC_WINDOW; n++)
 		{
-			activeRequests[i].sockBufferDatabase[n].isBufferUsed = false;
+//			activeRequests[i].sockBufferDatabase[n].isBufferUsed = false;
+			activeRequests[i].defense_approve = true;
 		}
 	}
 }
@@ -256,8 +260,12 @@ void set_txt_inp (int countLine, char *val)
 	}
 }
 
-double downlink_mips, uplink_mips;
-double downlink_bw, uplink_bw;
+//double downlink_mips, uplink_mips;
+//double downlink_bw, uplink_bw;
+double downlink_mips = 0, uplink_mips = 0, downlink_bw = 0, uplink_bw = 0;
+int meas_count_downlink = 0, meas_count_uplink = 0;
+extern int cpu_avail, down_bw_avail, up_bw_avail;
+long int processed_bytes_in_window[MAX_NO_CONN_TO_PDCP];
 int main (INT32 argc, INT8 **argv )
 {
 	bool chkFirstConn = true;
@@ -504,10 +512,11 @@ int main (INT32 argc, INT8 **argv )
 #endif
 
 	  report ();
-	  struct timespec timePerPacket_start, timePerPacket_end, timePerProc_start, timePerProc_end;
+	  struct timespec timePerPacket_start, timePerPacket_end, timePerProc_start, timePerProc_end, monitoring_window_start, monitoring_window_end;
 	  double timePerPacket, timePerProc;
 	  bool start_report = false;
-		cld_reg (gConnectSockFd);
+	  cld_reg (gConnectSockFd);
+	  clock_gettime(CLOCK_MONOTONIC, &monitoring_window_start);
 	while (TRUE)
 	{
 		int measurem_intvall_s  = 0;
@@ -575,20 +584,12 @@ int main (INT32 argc, INT8 **argv )
 					{
 						start_report = true;
 						MsgReceive(i_fd, noBuffer);
-
 					}
 			}
 
 		}
-//		PDCP_DATA_REQ_FUNC_T 			*tempPDCPDownMsg;
-//		void 			*tempPDCPDownMsg;
-//		PDCP_DATA_IND_T 				*tempPDCPUpMsg;
-		bool rohc_avail;
 		int packet_size = 0;
-		downlink_mips = 0;
-		uplink_mips = 0;
-		downlink_bw = 0;
-		uplink_bw = 0;
+		double current_downlink_mips = 0, current_uplink_mips = 0, current_downlink_bw, current_uplink_bw;
 
 		  for (noConect = 0; noConect < MAX_NO_CONN_TO_PDCP; noConect++)
 		  {
@@ -599,30 +600,47 @@ int main (INT32 argc, INT8 **argv )
 					if (activeRequests[noConect].msgID == PDCP_DATA_REQ_FUNC)
 					{
 						//Downlink CPU consumption calculation
-#ifdef ROHC_COMPRESSION
-						rohc_avail = true;
-#else
-						rohc_avail = false;
-#endif
+						meas_count_downlink++;
 						packet_size = (int) (((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
-						downlink_mips += (int) calc_downlink_mips (packet_size, rohc_avail);
-						downlink_bw += calc_downlink_BW (packet_size, rohc_avail);
+#ifdef ROHC_COMPRESSION
+						current_downlink_mips = calc_downlink_mips (packet_size, true);
+						current_downlink_bw += calc_downlink_BW (packet_size, true);
+#else
+						current_downlink_mips = calc_downlink_mips (packet_size, false);
+						current_downlink_bw += calc_downlink_BW (packet_size, false);
+#endif
+
+						downlink_mips += current_downlink_mips;
+						downlink_bw += current_downlink_bw;
 					} else if (activeRequests[noConect].msgID == PDCP_DATA_IND)
 					{
 						//Uplink CPU consumption calculation
+
+						meas_count_uplink++;
+						packet_size = (int) (((PDCP_DATA_IND_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
 #ifdef ROHC_COMPRESSION
-						rohc_avail = true;
+						current_uplink_mips = calc_uplink_mips (packet_size, true);
+						current_uplink_bw += calc_uplink_bw (packet_size, true);
 #else
 						rohc_avail = false;
+						current_uplink_mips = calc_uplink_mips (packet_size, false);
+						current_uplink_bw += calc_uplink_bw (packet_size, false);
 #endif
-						packet_size = (int) (((PDCP_DATA_IND_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
-						uplink_mips += calc_uplink_mips (packet_size, rohc_avail);
-						uplink_bw += calc_uplink_bw (packet_size, rohc_avail);
+						uplink_mips += current_uplink_mips;
+						uplink_bw += current_uplink_bw;
+
 					}
 				}
 			}
 		  }
 
+		  if (((current_downlink_mips + current_uplink_mips) > cpu_avail) || ((current_downlink_bw + uplink_bw) > (down_bw_avail + up_bw_avail)))
+		  {
+			  defense ();
+		  }
+
+
+		  //The PDCP processing starts here
 		int noRecPkt = 0;
 		total_processed_bytes = 0;
 
@@ -634,7 +652,7 @@ int main (INT32 argc, INT8 **argv )
 #endif
 				for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
 				{
-					if (activeRequests[noConect].sockBufferDatabase[noBuffer].isBufferUsed == true)
+					if ((activeRequests[noConect].sockBufferDatabase[noBuffer].isBufferUsed == true) && (activeRequests[noConect].defense_approve == true))
 					{
 						noRecPkt++;
 						db_index = activeRequests[noConect].dbIndex;
@@ -647,12 +665,27 @@ int main (INT32 argc, INT8 **argv )
 			pdcp_time_per_packet (timePerPacket, db_index);
 #endif
 
+						processed_bytes_in_window [noConect] += ((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size;
 						db_index = -1;
 						buffer_index = -1;
+						activeRequests[noConect].sockBufferDatabase[noBuffer].isBufferUsed = false;
 					}
 				}
 		  }
 		  init_connection ();
+
+		  clock_gettime(CLOCK_MONOTONIC, &monitoring_window_end);
+		  double time_window = (double)(monitoring_window_end.tv_sec - monitoring_window_start.tv_sec);
+
+		  if (time_window > PDCP_MONITOR_WINDOW)
+		  {
+			  clock_gettime(CLOCK_MONOTONIC, &monitoring_window_start);
+			  for (noConect = 0; noConect < MAX_NO_CONN_TO_PDCP; noConect++)
+			  {
+				  activeRequests[noConect].total_bytes_rec = 0;
+				  processed_bytes_in_window [noConect] = 0;
+			  }
+		  }
 
 #ifdef create_report
 			clock_gettime(CLOCK_MONOTONIC, &timePerProc_end);

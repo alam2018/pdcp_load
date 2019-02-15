@@ -8,7 +8,13 @@
 #ifndef PDCP_DEFENSE_H_
 #define PDCP_DEFENSE_H_
 
+#define MAX_CPU_CAPACITY				9485.8662
+
+
+#define SEC_TO_MILI  1000
+#define NANO_TO_MILI 0.000001
 #define APPROXIMATE_REMAINING_TIME 50
+#define MAX_BUFFER_PER_BEARER	5*1500
 
 #define INDEX	22
 #define MAX_QCI_PRO 90  //Obtained from 5qi table

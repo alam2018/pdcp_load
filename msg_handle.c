@@ -377,7 +377,6 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 		activeRequests[schedID].sockBufferDatabase[bufferCount].pData += sockExtHeaderSize;
 
 		activeRequests[schedID].sockBufferDatabase[bufferCount].msgSize = ExtRecMsg.msgSize;
-		activeRequests[schedID].sockBufferDatabase[bufferCount].isBufferUsed = true;
 		activeRequests[schedID].msgID = ExtRecMsg.msgId;
 
 		 if (ExtRecMsg.msgSize)
@@ -389,6 +388,9 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 				 perror("recv2");
 				 printf("recv() returned Error \n");
 			 }
+			 activeRequests[schedID].sockBufferDatabase[bufferCount].isBufferUsed = true;
+			 clock_gettime(CLOCK_MONOTONIC, &activeRequests[schedID].sockBufferDatabase[bufferCount].bufferRecTime);
+			 activeRequests[schedID].total_bytes_rec += ((PDCP_DATA_REQ_FUNC_T*)activeRequests[schedID].sockBufferDatabase[bufferCount].pData)->sdu_buffer_size;
 		 }
 
 //		 // call message handler here

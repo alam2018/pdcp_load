@@ -34,8 +34,13 @@
 
 
 extern _tSchedBuffer activeRequests[MAX_NO_CONN_TO_PDCP];
+extern double total_mips_req, total_bw_req;
+
+//Function forward deceleration
+void activate_skipping ();
 
 int cpu_avail, down_bw_avail, up_bw_avail;
+double mips_per_usr[MAX_NO_CONN_TO_PDCP], bw_per_usr[MAX_NO_CONN_TO_PDCP];
 
 
 //This function calculates the priority of a bearer based on E2E time delay budget according to 5QI table and elapsed time at pdcp
@@ -112,23 +117,63 @@ double get_uti_prio (int index)
 	int cpu_capacity = MAX_CPU_CAPACITY;
 	utilization_prio = (double) (activeRequests[index].total_bytes_rec / cpu_capacity);
 
-	return utilization_prio;
+	double dummy_multiConnectivity_multicast_prio = 1;  //TODO when multi-connectivity is added to the traffic generator for the evaluation, we need proper prio calculation here
+
+	return (utilization_prio * dummy_multiConnectivity_multicast_prio);
 }
+
 
 int defense ()
 {
 	//First we need to prioritize all the bearers
-	int noConnect, noBuffer;
+	int noConnect;
 	for (noConnect = 0; noConnect < MAX_NO_CONN_TO_PDCP; noConnect++)
 	{
 		double timing_prio = get_time_prio(noConnect);
 		double qci_prio = get_qci_prio (activeRequests[noConnect].qci);
 		double unscheduling_prio = get_unprocessed_bytes_prio (noConnect);
 		double utilization_prio = get_uti_prio (noConnect);
+
+		activeRequests[noConnect].prio = timing_prio * qci_prio * unscheduling_prio * utilization_prio;
 	}
+
+
+	activate_skipping ();
 
 	return 0;
 }
 
+void activate_skipping ()
+{
+	int pdcp_index [MAX_NO_CONN_TO_PDCP];
+	int i, j;
+	for (i = 0; i < MAX_NO_CONN_TO_PDCP; i++)
+	{
+		if (activeRequests[i].isThisInstanceActive == true)
+		{
+			for (j = 1; j < MAX_NO_CONN_TO_PDCP; j++)
+			{
+				if (activeRequests[j].isThisInstanceActive == true)
+				{
+					if (activeRequests[i].prio > activeRequests[j].prio)
+					{
+						pdcp_index[i] = j;
+					}
+				}
+			}
+		}
+	}
+
+	for (i = 0; i < MAX_NO_CONN_TO_PDCP; i++)
+	{
+		if ((total_mips_req > cpu_avail) || (total_bw_req > (down_bw_avail + up_bw_avail)))
+		{
+			activeRequests[pdcp_index[i]].defense_approve = false;
+			total_mips_req = total_mips_req - mips_per_usr[i];
+			total_bw_req = total_bw_req - bw_per_usr[i];
+		}
+		break;
+	}
+}
 
 

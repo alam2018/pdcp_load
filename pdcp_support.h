@@ -17,12 +17,12 @@
 
 //This macro enable all the measurements and initialize prepare reports
 #define create_report
-#undef create_report
+//#undef create_report
 
 //This macro writes detailed time measurement of different portion (ROHC, PDU, ENC) of PDCP.
 //Be careful about def or undef this macro. Either define this or "mips_calc_report". not at the same time both.
 #define detailed_timing_report
-#undef detailed_timing_report
+//#undef detailed_timing_report
 
 //This macro writes detailed time measurement of different portion (ROHC, PDU, ENC) of PDCP
 #define mips_calc_report

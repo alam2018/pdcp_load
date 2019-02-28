@@ -270,6 +270,7 @@ int  AddCon(int nSockFd, int Addr)
 			activeRequests[i].dbIndex = i;
 			strcpy(activeRequests[i].entity, "OAI");
 			activeRequests[i].sizeUsd =0;
+			activeRequests[i].isThisInstanceActive = true;
 			printf ("Connection established with OAI at socket %d\n\n", nSockFd);
 
 #ifdef ROHC_COMPRESSION

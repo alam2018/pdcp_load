@@ -13,16 +13,16 @@
 #define SEC_TO_NANO_SECONDS  1000000000
 #define NANO_TO_MICRO  0.001
 
-
+double static pdcpTime_per_pkt;
 
 //This macro enable all the measurements and initialize prepare reports
 #define create_report
-//#undef create_report
+#undef create_report
 
 //This macro writes detailed time measurement of different portion (ROHC, PDU, ENC) of PDCP.
 //Be careful about def or undef this macro. Either define this or "mips_calc_report". not at the same time both.
 #define detailed_timing_report
-//#undef detailed_timing_report
+#undef detailed_timing_report
 
 //This macro writes detailed time measurement of different portion (ROHC, PDU, ENC) of PDCP
 #define mips_calc_report
@@ -30,7 +30,7 @@
 
 //This macro calculates total MIPS requirement by PDCP every second
 #define mips_sum_report
-#undef mips_sum_report
+//#undef mips_sum_report
 
 #define create_uplink_report
 #undef create_uplink_report
@@ -90,6 +90,15 @@ int mac_eNB_get_rrc_status_send(
 	int pdcpInsID;				//Incase of multiple bearer handling, PDCP internal database ID
 	int dataDirection;			//If 0 then dataflow uplink direction elseIF 1 downlink direction
 } conn_info;*/
+
+typedef struct pdcpProperty {
+	double downlinkMips;
+	double uplinkMips;
+	double downlinkBw;
+	double uplinkBw;
+	double prio;
+	int socketDbIndex;
+}_tpdcpMeasurement;
 
 //Report writing deceleration
 void update_rohc_db (double rohc_time, int dbIndex);

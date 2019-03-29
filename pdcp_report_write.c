@@ -86,12 +86,18 @@ void report () {
 	{
 		printf ("File not created okay, errno = %d\n", errno);
 	}
+	//This generates report about whole PDCP process time in term of MIPS
+/*	fprintf (mips_summ, "Reference Time; Total receive cycle; Number of packet; Total processed bytes; "
+			"Total required MIPS per second;\n");*/
+
+	//This generates report about only PDCP pkt process time in term of millisecond
 	fprintf (mips_summ, "Reference Time; Total receive cycle; Number of packet; Total processed bytes; "
-			"Total required MIPS per second;\n");
+				"Total required Time for pkt process (ms);\n");
 #endif
 }
 
-void init_report()
+
+void init_report_write()
 {
 	int i;
 	for (i = 0; i<MAX_NO_CONN_TO_PDCP; i++)
@@ -120,9 +126,11 @@ void update_enc_db (double enc_time, int dbIndex)
 	pdcp_report[dbIndex].enc_time = enc_time;
 }
 
+
 void pdcp_time_per_packet (double pdcp_time, int dbIndex)
 {
 	pdcpTime_per_packet[dbIndex] = pdcp_time;
+	pdcpTime_per_pkt += pdcp_time;
 }
 
 void total_pdcp_time (double total_pdcp_time)
@@ -144,7 +152,7 @@ void create_pdcp_report ()
 	}
 	fprintf (pdcp_report_write,"%f\n", pdcpTime_per_process/1000);
 
-	init_report();
+	init_report_write();
 }
 
 double total_mips_pro_sec = 0;
@@ -184,15 +192,24 @@ void mips_report (int totalPktNo, long long int totalPktSize)
 	{
 
 #ifdef mips_sum_report
-	fprintf (mips_summ,"%ld; %d; %lld; %lld; %f;\n", refernce_time.tv_sec, rec_cycle -1,
-			noPkt - (long long int) totalPktNo, procBytes - totalPktSize, total_mips_pro_sec);
+		//This generates report about whole PDCP process time in term of MIPS
+/*	fprintf (mips_summ,"%ld; %d; %lld; %lld; %f;\n", refernce_time.tv_sec, rec_cycle -1,
+			noPkt - (long long int) totalPktNo, procBytes - totalPktSize, total_mips_pro_sec);*/
+
+		//This generates report about only PDCP pkt process time in term of millisecond
+		fprintf (mips_summ,"%ld; %d; %lld; %lld; %f;\n", refernce_time.tv_sec, rec_cycle -1,
+					noPkt - (long long int) totalPktNo, procBytes - totalPktSize, pdcpTime_per_pkt/1000);
+		pdcpTime_per_pkt = 0;
 #endif
 		rec_cycle = 1;
-		noPkt = (long long int) totalPktNo;
-		procBytes = totalPktSize;
+//		noPkt = (long long int) totalPktNo;
+//		procBytes = totalPktSize;
+		noPkt = 0;
+		procBytes = 0;
 		tempVal.tv_sec = refernce_time.tv_sec;
 		total_mips_pro_sec = 0;
-		total_mips_pro_sec += total_mips;
+//		total_mips_pro_sec += total_mips;
+		total_mips_pro_sec = 0;
 
 	} else
 		perror("ERROR report write for MIPS per second");
@@ -202,7 +219,7 @@ void mips_report (int totalPktNo, long long int totalPktSize)
 	fprintf (pdcp_report_write,"%f; %ld; %f;\n", total_mips, refernce_time.tv_sec, total_mips_pro_sec);
 #endif
 
-	init_report();
+	init_report_write();
 }
 
 int totalConnection = 0;

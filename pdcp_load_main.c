@@ -267,9 +267,11 @@ double downlink_mips = 0, uplink_mips = 0, downlink_bw = 0, uplink_bw = 0;
 int meas_count_downlink = 0, meas_count_uplink = 0;
 extern int cpu_avail, down_bw_avail, up_bw_avail;
 long int processed_bytes_in_window[MAX_NO_CONN_TO_PDCP];
-extern double mips_per_usr[MAX_NO_CONN_TO_PDCP], bw_per_usr[MAX_NO_CONN_TO_PDCP];
+extern double mips_per_usr[MAX_NO_CONN_TO_PDCP], down_bw_per_usr[MAX_NO_CONN_TO_PDCP], up_bw_per_usr[MAX_NO_CONN_TO_PDCP];
 double current_downlink_mips = 0, current_uplink_mips = 0, current_downlink_bw = 0, current_uplink_bw = 0;
 double total_mips_req, total_bw_req;
+_tpdcpMeasurement pdcpData[MAX_NO_CONN_TO_PDCP];
+int total_pdcp_instance_per_rec_cycle;
 
 int main (INT32 argc, INT8 **argv )
 {
@@ -589,17 +591,18 @@ int main (INT32 argc, INT8 **argv )
 					{
 						start_report = true;
 						MsgReceive(i_fd, noBuffer);
+//						MsgReceive(i_fd, 0);
 					}
 			}
 
 		}
-/*		int packet_size = 0;
-		double per_usr_mips_calc = 0, per_usr_bw_calc = 0;
-
+		total_pdcp_instance_per_rec_cycle =0;
+		int packet_size = 0;
+		double per_usr_mips_calc = 0, per_usr_down_bw_calc = 0, per_usr_up_bw_calc = 0;
+		current_downlink_mips = 0, current_downlink_bw = 0, current_uplink_mips = 0, current_uplink_bw = 0;
 		  for (noConect = 0; noConect < MAX_NO_CONN_TO_PDCP; noConect++)
 		  {
-			  per_usr_mips_calc = 0;
-			  per_usr_bw_calc = 0;
+			  per_usr_mips_calc = 0, per_usr_down_bw_calc = 0, per_usr_up_bw_calc = 0;
 			for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
 			{
 				if (activeRequests[noConect].sockBufferDatabase[noBuffer].isBufferUsed == true)
@@ -617,7 +620,7 @@ int main (INT32 argc, INT8 **argv )
 						current_downlink_bw += calc_downlink_BW (packet_size, true);
 #else
 						per_usr_mips_calc = calc_downlink_mips (packet_size, false);
-						per_usr_bw_calc = calc_downlink_mips (packet_size, false);
+						per_usr_down_bw_calc = calc_downlink_BW (packet_size, false);
 
 						current_downlink_mips += calc_downlink_mips (packet_size, false);
 						current_downlink_bw += calc_downlink_BW (packet_size, false);
@@ -639,7 +642,7 @@ int main (INT32 argc, INT8 **argv )
 						current_uplink_bw += calc_uplink_bw (packet_size, true);
 #else
 						per_usr_mips_calc = calc_downlink_mips (packet_size, false);
-						per_usr_bw_calc = calc_downlink_mips (packet_size, false);
+						per_usr_up_bw_calc = calc_uplink_bw (packet_size, false);
 
 						current_uplink_mips += calc_uplink_mips (packet_size, false);
 						current_uplink_bw += calc_uplink_bw (packet_size, false);
@@ -649,21 +652,28 @@ int main (INT32 argc, INT8 **argv )
 
 					}
 				}
+				mips_per_usr[noConect] += per_usr_mips_calc;
+				down_bw_per_usr [noConect] += per_usr_down_bw_calc;
+				up_bw_per_usr [noConect] += per_usr_up_bw_calc;
 			}
 
-			mips_per_usr[noConect] = per_usr_mips_calc;
-			bw_per_usr [noConect] = per_usr_bw_calc;
+//			total_pdcp_instance_per_rec_cycle++;
 		  }
 
 		  total_mips_req = current_downlink_mips + current_uplink_mips;
 		  total_bw_req = current_downlink_bw + current_uplink_bw;
 
-		  if ((total_mips_req > cpu_avail) || (total_bw_req > (down_bw_avail + up_bw_avail)))
+		  if ((total_mips_req > cpu_avail) || (current_downlink_bw > down_bw_avail) || (current_uplink_bw > current_uplink_bw))
 		  {
 			  defense ();
-		  }*/
+		  }
 
-
+		  for (noConect = 0; noConect < MAX_NO_CONN_TO_PDCP; noConect++)
+		  {
+				mips_per_usr[noConect] = 0;
+				down_bw_per_usr [noConect] = 0;
+				up_bw_per_usr [noConect] = 0;
+		  }
 		  //The PDCP processing starts here
 		int noRecPkt = 0;
 		total_processed_bytes = 0;

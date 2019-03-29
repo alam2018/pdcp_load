@@ -35,12 +35,13 @@
 
 extern _tSchedBuffer activeRequests[MAX_NO_CONN_TO_PDCP];
 extern double total_mips_req, total_bw_req;
+extern double current_downlink_mips, current_uplink_mips, current_downlink_bw, current_uplink_bw;
 
 //Function forward deceleration
 void activate_skipping ();
 
 int cpu_avail, down_bw_avail, up_bw_avail;
-double mips_per_usr[MAX_NO_CONN_TO_PDCP], bw_per_usr[MAX_NO_CONN_TO_PDCP];
+double mips_per_usr[MAX_NO_CONN_TO_PDCP], down_bw_per_usr[MAX_NO_CONN_TO_PDCP], up_bw_per_usr[MAX_NO_CONN_TO_PDCP];
 
 
 //This function calculates the priority of a bearer based on E2E time delay budget according to 5QI table and elapsed time at pdcp
@@ -166,13 +167,18 @@ void activate_skipping ()
 
 	for (i = 0; i < MAX_NO_CONN_TO_PDCP; i++)
 	{
-		if ((total_mips_req > cpu_avail) || (total_bw_req > (down_bw_avail + up_bw_avail)))
+		if (activeRequests[i].isThisInstanceActive == true)
 		{
-			activeRequests[pdcp_index[i]].defense_approve = false;
-			total_mips_req = total_mips_req - mips_per_usr[i];
-			total_bw_req = total_bw_req - bw_per_usr[i];
+			if ((total_mips_req > cpu_avail) || (current_downlink_bw > down_bw_avail) || (current_uplink_bw > current_uplink_bw))
+			{
+				activeRequests[pdcp_index[i]].defense_approve = false;
+				total_mips_req = total_mips_req - mips_per_usr[pdcp_index[i]];
+	//			total_bw_req = total_bw_req - bw_per_usr[i];
+				current_downlink_bw = current_downlink_bw - down_bw_per_usr[pdcp_index[i]];
+				current_uplink_bw = current_uplink_bw - down_bw_per_usr[pdcp_index[i]];
+			}
+			break;
 		}
-		break;
 	}
 }
 

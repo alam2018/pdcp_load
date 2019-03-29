@@ -272,6 +272,8 @@ int  AddCon(int nSockFd, int Addr)
 			activeRequests[i].sizeUsd =0;
 			activeRequests[i].isThisInstanceActive = true;
 			printf ("Connection established with OAI at socket %d\n\n", nSockFd);
+			//Indicate that the first buffer is being initialized and ready for usage
+			activeRequests[i].sockBufferDatabase[0].beginUsage = true;
 
 #ifdef ROHC_COMPRESSION
 			/* create a ROHC compressor with small CIDs and the largest MAX_CID
@@ -304,7 +306,7 @@ int  AddCon(int nSockFd, int Addr)
 return -2;
 }
 
-int findCon(int nSockFd)
+int findCon(int nSockFd, int bufferIndex)
 {
 	int sockfound=0;
 	if (nSockFd<=0)
@@ -315,8 +317,16 @@ int findCon(int nSockFd)
 	{
 		if(activeRequests[i].sockFD ==nSockFd)//entry is there
 		{
-			sockfound =activeRequests[i].IPaddr;
-			activeRequests[i].sockBufferDatabase[0].pData -= sockExtHeaderSize;
+			if (activeRequests[i].sockBufferDatabase[bufferIndex].beginUsage == true)
+			{
+				sockfound =activeRequests[i].IPaddr;
+				activeRequests[i].sockBufferDatabase[0].pData -= sockExtHeaderSize;
+			} else
+			{
+				activeRequests[i].sockBufferDatabase[bufferIndex].beginUsage = true;
+				sockfound =activeRequests[i].IPaddr;
+			}
+
 			return i;//if an empty buffer exists for this fd use it
 		}
 
@@ -331,7 +341,7 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 	INT32 retValue = -1;
 	sckClose = false;
 	// memorise the start address of the send buffer
-	int schedID = findCon(connectedSockFd);
+	int schedID = findCon(connectedSockFd, bufferIndex);
 	connIndex = schedID;
 	bufferCount = bufferIndex;
 
@@ -534,17 +544,9 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 
 //			responseBufferSize = sizeof (UINT32) + sizeof (UINT32) + msgSize;
 //			responseBufferSize = sizeof (UINT32) + sizeof (UINT32) + tstSize;
-			MsgInsertFunc (PDCP_DATA_REQ_FUNC, sizeof (PDCP_DATA_REQ_FUNC_T), &pdcpDataReqFuncMsg, &temppdcpSendBuffer);
-/*			int i;
-			for (i = 0; i<MAX_NO_CONN_TO_PDCP; i++)
-			{
-				if (activeRequests[i].sockFD > 0)
-				{
-					MsgSend (activeRequests[i].sockFD);
-				}
-			}*/
 
-			MsgSend (sockFd);
+//			MsgInsertFunc (PDCP_DATA_REQ_FUNC, sizeof (PDCP_DATA_REQ_FUNC_T), &pdcpDataReqFuncMsg, &temppdcpSendBuffer);
+//			MsgSend (sockFd);
 
 /*			if (pdcpDataReqFuncMsg.rohc_packet.len > 60 || pdcpDataReqFuncMsg.sdu_buffer_size > 2000)
 			{

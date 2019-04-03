@@ -176,7 +176,7 @@ boolean_t pdcp_serialize_user_plane_data_pdu_with_long_sn_buffer(unsigned char* 
    * Fill Data or Control field
    */
   if (pdu->dc == PDCP_DATA_PDU_BIT_SET) {
-#ifndef create_report
+#if !defined (create_report) && !defined (freq_report)
     LOG_D(PDCP, "Setting PDU as a DATA PDU\n");
 #endif
     pdu_buffer[0] |= 0x80; // set the first bit as 1
@@ -245,7 +245,9 @@ boolean_t pdcp_serialize_user_plane_data_pdu_with_long_sn_buffer_alam(unsigned c
    * Fill Data or Control field
    */
   if (pdu->dc == PDCP_DATA_PDU_BIT_SET) {
+#if !defined (create_report) && !defined (freq_report)
     LOG_D(PDCP, "Setting PDU as a DATA PDU\n");
+#endif
     pdu_buffer[0] |= 0x80; // set the first bit as 1
   }
 

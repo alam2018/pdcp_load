@@ -15,6 +15,11 @@
 
 double static pdcpTime_per_pkt;
 
+
+//Frequency analysis report
+#define freq_report
+#undef freq_report
+
 //This macro enable all the measurements and initialize prepare reports
 #define create_report
 #undef create_report
@@ -30,7 +35,7 @@ double static pdcpTime_per_pkt;
 
 //This macro calculates total MIPS requirement by PDCP every second
 #define mips_sum_report
-//#undef mips_sum_report
+#undef mips_sum_report
 
 #define create_uplink_report
 #undef create_uplink_report

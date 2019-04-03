@@ -76,7 +76,7 @@ uint32_t pdcp_get_next_count_tx(
       count = ((pdcp_pP->tx_hfn << 12) | (pdcp_sn & 0x0FFF));
     }
   }
-#ifndef create_report
+#if !defined create_report && !defined freq_report
   LOG_D(PDCP, "[OSA] TX COUNT = 0x%08x\n", count);
 #endif
 
@@ -146,7 +146,7 @@ pdcp_apply_security(
   if (srb_flagP) {
     /* SRBs */
     uint8_t *mac_i;
-#ifndef create_report
+#if !defined (create_report) && !defined (freq_report)
     LOG_D(PDCP, "[OSA][RB %d] %s Applying control-plane security %d \n",
             rb_id, (pdcp_pP->is_ue != 0) ? "UE -> eNB" : "eNB -> UE", pdcp_pP->integrityProtAlgorithm);
 #endif
@@ -165,7 +165,7 @@ pdcp_apply_security(
 
     encrypt_params.key = pdcp_pP->kRRCenc;  // + 128  // bit key
   } else {
-#ifndef create_report
+#if !defined (create_report) && !defined (freq_report)
     LOG_D(PDCP, "[OSA][RB %d] %s Applying user-plane security\n",
           rb_id, (pdcp_pP->is_ue != 0) ? "UE -> eNB" : "eNB -> UE");
 #endif
@@ -221,12 +221,16 @@ pdcp_validate_security(
   decrypt_params.key_length = 16;
 
   if (srb_flagP) {
+#ifndef freq_report
     LOG_D(PDCP, "[OSA][RB %d] %s Validating control-plane security\n",
           rb_id, (pdcp_pP->is_ue != 0) ? "eNB -> UE" : "UE -> eNB");
+#endif
     decrypt_params.key = pdcp_pP->kRRCenc;// + 128;
   } else {
+#ifndef freq_report
     LOG_D(PDCP, "[OSA][RB %d] %s Validating user-plane security\n",
           rb_id, (pdcp_pP->is_ue != 0) ? "eNB -> UE" : "UE -> eNB");
+#endif
     decrypt_params.key = pdcp_pP->kUPenc;// + 128;
   }
 

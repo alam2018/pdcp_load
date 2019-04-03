@@ -52,6 +52,7 @@ double mips_from_us (double time_in_us)
 FILE *pdcp_report_write;
 FILE *conect_status;
 FILE *mips_summ;
+FILE *pdcp_freq_rep;
 void report () {
 //	pdcp_report_write= (FILE **) malloc(96 * sizeof(FILE*));
 	pdcp_report_write = fopen ("feeder_report.csv","w+");
@@ -93,6 +94,22 @@ void report () {
 	//This generates report about only PDCP pkt process time in term of millisecond
 	fprintf (mips_summ, "Reference Time; Total receive cycle; Number of packet; Total processed bytes; "
 				"Total required Time for pkt process (ms);\n");
+#endif
+
+#ifdef freq_report
+	pdcp_freq_rep = fopen ("pdcp_freq_rep.csv","w+");
+	setbuf(pdcp_freq_rep, NULL);
+	if (pdcp_freq_rep == NULL)
+	{
+		printf ("File not created okay, errno = %d\n", errno);
+	}
+	//This generates report about whole PDCP process time in term of MIPS
+/*	fprintf (mips_summ, "Reference Time; Total receive cycle; Number of packet; Total processed bytes; "
+			"Total required MIPS per second;\n");*/
+
+	//This generates report about only PDCP pkt process time in term of millisecond
+	fprintf (pdcp_freq_rep, "Reference Time; Total receive cycle; Number of packet; Total processed bytes; "
+				"Total required Time for pkt process (us);\n");
 #endif
 }
 
@@ -199,6 +216,13 @@ void mips_report (int totalPktNo, long long int totalPktSize)
 		//This generates report about only PDCP pkt process time in term of millisecond
 		fprintf (mips_summ,"%ld; %d; %lld; %lld; %f;\n", refernce_time.tv_sec, rec_cycle -1,
 					noPkt - (long long int) totalPktNo, procBytes - totalPktSize, pdcpTime_per_pkt/1000);
+		pdcpTime_per_pkt = 0;
+#endif
+
+#ifdef freq_report
+		//This generates report about only PDCP pkt process time in term of millisecond
+		fprintf (pdcp_freq_rep,"%ld; %d; %lld; %lld; %f;\n", refernce_time.tv_sec, rec_cycle -1,
+					noPkt, procBytes, pdcpTime_per_pkt/1000);
 		pdcpTime_per_pkt = 0;
 #endif
 		rec_cycle = 1;

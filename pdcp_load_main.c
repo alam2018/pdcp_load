@@ -43,7 +43,7 @@
 #include "socket_msg.h"
 
 
-#define PDCP_MONITOR_WINDOW 5
+//#define defense_acrive
 
 //conn_info connInfo[MAX_NO_CONN_TO_PDCP];
 
@@ -61,7 +61,7 @@ fd_set readFds;
 int measurem_intvall_s  = 0;
 int measurem_intvall_us = 2;
 
-
+int PDCP_MONITOR_WINDOW = 5;
 
 // Socket and socket function related variables
 struct sockaddr_in socketAddrPDCP, socketCldMan;
@@ -82,24 +82,6 @@ UINT32 sizeOfMsg;
 UINT32 responseBufferSize;
 
 
-//******************************************************************************
-// PDCP self test
-//******************************************************************************
-
-//#define SELF_TEST_ENABLE 1
-
-
-
-//******************************************************************************
-// PDCP variables
-//******************************************************************************
-/*
- * These are the PDCP entities that will be utilised
- * throughout the test
- *
- * For pdcp_data_req() and pdcp_data_ind() these
- * are passed and used
- */
 pdcp_t pdcp_array[MAX_NO_CONN_TO_PDCP];
 int db_index, buffer_index;
 
@@ -120,9 +102,17 @@ void 	init_connection ()
 	{
 		for (n=0; n<MAX_BUFFER_REC_WINDOW; n++)
 		{
+			if (activeRequests[i].defense_approve == false)
+			{
+				activeRequests[i].isThisInstanceActive = true;
+			} else
+			{
+				activeRequests[i].isThisInstanceActive = false;
+			}
 //			activeRequests[i].sockBufferDatabase[n].isBufferUsed = false;
 			activeRequests[i].defense_approve = true;
-			activeRequests[i].isThisInstanceActive = false;
+//			activeRequests[i].isThisInstanceActive = false;
+			activeRequests[i].prio = 0;
 		}
 	}
 }
@@ -272,6 +262,8 @@ double current_downlink_mips = 0, current_uplink_mips = 0, current_downlink_bw =
 double total_mips_req, total_bw_req;
 _tpdcpMeasurement pdcpData[MAX_NO_CONN_TO_PDCP];
 int total_pdcp_instance_per_rec_cycle;
+struct timespec pdcp_proc_start, pdcp_proc_end;
+
 
 int main (INT32 argc, INT8 **argv )
 {
@@ -518,6 +510,7 @@ int main (INT32 argc, INT8 **argv )
 	  }
 #endif
 
+	  get_CPU_process_bytes_Downlink();
 	  report ();
 	  struct timespec timePerPacket_start, timePerPacket_end, timePerProc_start, timePerProc_end, monitoring_window_start, monitoring_window_end;
 	  double timePerPacket, timePerProc;
@@ -574,6 +567,10 @@ int main (INT32 argc, INT8 **argv )
 			process_start_time_record (timePerProc_start);
 #endif
 
+#ifdef freq_report
+			clock_gettime(CLOCK_MONOTONIC, &timePerProc_start);
+			process_start_time_record (timePerProc_start);
+#endif
 			/*----------------------------------------
 			 * Msg recieve from Cloud Manager
 			 */
@@ -585,13 +582,12 @@ int main (INT32 argc, INT8 **argv )
 		 INT32 i_fd, noBuffer, noConect = 0;
 		for (i_fd = firstSockFD; i_fd <= fdmax; i_fd++)
 		{
-			for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
+//			for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
 			{
 				if (FD_ISSET(i_fd,&readFds) && i_fd != gConnectSockFd)
 					{
 						start_report = true;
 						MsgReceive(i_fd, noBuffer);
-//						MsgReceive(i_fd, 0);
 					}
 			}
 
@@ -600,6 +596,7 @@ int main (INT32 argc, INT8 **argv )
 		int packet_size = 0;
 		double per_usr_mips_calc = 0, per_usr_down_bw_calc = 0, per_usr_up_bw_calc = 0;
 		current_downlink_mips = 0, current_downlink_bw = 0, current_uplink_mips = 0, current_uplink_bw = 0;
+#ifdef defense_acrive
 		  for (noConect = 0; noConect < MAX_NO_CONN_TO_PDCP; noConect++)
 		  {
 			  per_usr_mips_calc = 0, per_usr_down_bw_calc = 0, per_usr_up_bw_calc = 0;
@@ -610,6 +607,8 @@ int main (INT32 argc, INT8 **argv )
 					if (activeRequests[noConect].msgID == PDCP_DATA_REQ_FUNC)
 					{
 						//Downlink CPU consumption calculation
+						activeRequests[noConect].qci = (int) (((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->qci);
+
 						meas_count_downlink++;
 						packet_size = (int) (((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
 #ifdef ROHC_COMPRESSION
@@ -631,6 +630,7 @@ int main (INT32 argc, INT8 **argv )
 					} else if (activeRequests[noConect].msgID == PDCP_DATA_IND)
 					{
 						//Uplink CPU consumption calculation
+						activeRequests[noConect].qci = (int) (((PDCP_DATA_IND_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->qci);
 
 						meas_count_uplink++;
 						packet_size = (int) (((PDCP_DATA_IND_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
@@ -674,6 +674,8 @@ int main (INT32 argc, INT8 **argv )
 				down_bw_per_usr [noConect] = 0;
 				up_bw_per_usr [noConect] = 0;
 		  }
+
+#endif
 		  //The PDCP processing starts here
 		int noRecPkt = 0;
 		total_processed_bytes = 0;
@@ -699,6 +701,12 @@ int main (INT32 argc, INT8 **argv )
 			pdcp_time_per_packet (timePerPacket, db_index);
 #endif
 
+#ifdef freq_report
+			timePerPacket = (double)(pdcp_proc_end.tv_sec - pdcp_proc_start.tv_sec)*SEC_TO_NANO_SECONDS +
+					(double)(pdcp_proc_end.tv_nsec - pdcp_proc_start.tv_nsec);
+			pdcp_time_per_packet (timePerPacket, db_index);
+#endif
+
 						processed_bytes_in_window [noConect] += ((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size;
 						db_index = -1;
 						buffer_index = -1;
@@ -706,6 +714,7 @@ int main (INT32 argc, INT8 **argv )
 					}
 				}
 		  }
+
 		  init_connection ();
 
 		  clock_gettime(CLOCK_MONOTONIC, &monitoring_window_end);
@@ -736,6 +745,19 @@ int main (INT32 argc, INT8 **argv )
 #if defined (mips_calc_report) || defined (mips_sum_report)
 				mips_report (noRecPkt, total_processed_bytes);
 #endif
+				start_report = false;
+			}
+#endif
+
+#ifdef freq_report
+			clock_gettime(CLOCK_MONOTONIC, &timePerProc_end);
+			timePerProc = (double)(timePerProc_end.tv_sec - timePerProc_start.tv_sec)*SEC_TO_NANO_SECONDS +
+					(double)(timePerProc_end.tv_nsec - timePerProc_start.tv_nsec);
+			total_pdcp_time (timePerProc);
+
+			if (start_report == true)
+			{
+				mips_report (noRecPkt, total_processed_bytes);
 				start_report = false;
 			}
 #endif

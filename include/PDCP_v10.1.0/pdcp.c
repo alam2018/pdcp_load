@@ -178,8 +178,6 @@ boolean_t pdcp_data_req(
 
   hash_key_t         key             = HASHTABLE_NOT_A_KEY_VALUE;
   hashtable_rc_t     h_rc;
-//  VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_DATA_REQ,VCD_FUNCTION_IN);
-//  CHECK_CTXT_ARGS(ctxt_pP);
 
   if (modeP == PDCP_TRANSMISSION_MODE_TRANSPARENT) {
     AssertError (rb_idP < NB_RB_MBMS_MAX, return FALSE, "RB id is too high (%u/%d) %u %u!\n", rb_idP, NB_RB_MBMS_MAX, ctxt_pP->module_id, ctxt_pP->rnti);
@@ -193,15 +191,7 @@ boolean_t pdcp_data_req(
 
   pdcp_p = &pdcp_array[db_index];
 
-/*  for (count = 0; count < MAX_NO_CONN_TO_PDCP; count++)
-  {
-	  if (connInfo[count].bearerID == rb_idP)
-	  {
-		  pdcp_p = &pdcp_array[count];
-		  tempcount = count;
-	  }
-  }*/
-
+/*
   if (ctxt_pP->enb_flag == ENB_FLAG_NO) {
     pdcp_p->is_ue = TRUE;
 
@@ -215,22 +205,8 @@ boolean_t pdcp_data_req(
 	  pdcp_data_ind_uplink (db_index, ctxt_pP, srb_flagP, 0, rb_idP, sdu_buffer_sizeP, sdu_buffer_pP);
 	  return TRUE;
   }
+*/
 
-/*  key = PDCP_COLL_KEY_VALUE(ctxt_pP->module_id, ctxt_pP->rnti, ctxt_pP->enb_flag, rb_idP, srb_flagP);
-
-
-  //TODO only for test. delete immidietly after test
-//  h_rc = hashtable_get(pdcp_coll_p, key, (void**)&pdcp_p); //Commented out for testing
-  h_rc = HASH_TABLE_OK;
-
-  if (h_rc != HASH_TABLE_OK) {
-    if (modeP != PDCP_TRANSMISSION_MODE_TRANSPARENT) {
-      LOG_W(PDCP, PROTOCOL_CTXT_FMT" Instance is not configured for rb_id %d Ignoring SDU...\n",
-            PROTOCOL_CTXT_ARGS(ctxt_pP),
-            rb_idP);
-    return FALSE;
-  }
-  }*/
 
   if (sdu_buffer_sizeP == 0) {
     LOG_W(PDCP, "Handed SDU is of size 0! Ignoring...\n");
@@ -247,12 +223,6 @@ boolean_t pdcp_data_req(
     // XXX What does following call do?
     mac_xface->macphy_exit("PDCP sdu buffer size > MAX_IP_PACKET_SIZE");
   }
-
-/*  if (ctxt_pP->enb_flag == ENB_FLAG_NO) {
-    start_meas(&eNB_pdcp_stats[ctxt_pP->module_id].data_req);
-  } else {
-    start_meas(&UE_pdcp_stats[ctxt_pP->module_id].data_req);
-  }*/
 
 
   // PDCP transparent mode for MBMS traffic
@@ -345,13 +315,6 @@ boolean_t pdcp_data_req(
           LOG_E(PDCP, PROTOCOL_PDCP_CTXT_FMT" Cannot fill PDU buffer with relevant header fields!\n",
                 PROTOCOL_PDCP_CTXT_ARGS(ctxt_pP,pdcp_p));
 
-/*          if (ctxt_pP->enb_flag == ENB_FLAG_NO) {
-            stop_meas(&eNB_pdcp_stats[ctxt_pP->module_id].data_req);
-          } else {
-            stop_meas(&UE_pdcp_stats[ctxt_pP->module_id].data_req);
-          }
-
-          VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_DATA_REQ,VCD_FUNCTION_OUT);*/
           return FALSE;
         }
 
@@ -368,19 +331,10 @@ boolean_t pdcp_data_req(
 
         free_mem_block(pdcp_pdu_p);
 
-#ifndef create_report
-/*        if (ctxt_pP->enb_flag == ENB_FLAG_NO) {
-          stop_meas(&eNB_pdcp_stats[ctxt_pP->module_id].data_req);
-        } else {
-          stop_meas(&UE_pdcp_stats[ctxt_pP->module_id].data_req);
-        }*/
-
-//        VCD_SIGNAL_DUMPER_DUMP_FUNCTION_BY_NAME(VCD_SIGNAL_DUMPER_FUNCTIONS_PDCP_DATA_REQ,VCD_FUNCTION_OUT);
-#endif
         return FALSE;
       }
 
-#ifndef create_report
+#if !defined (create_report) && !defined (freq_report)
       LOG_D(PDCP, "Sequence number %d is assigned to current PDU\n", current_sn);
 #endif
 

@@ -47,6 +47,7 @@
 extern mem_block_t       *pdcp_pdu_p;
 extern uint16_t           pdcp_pdu_size;
 
+extern struct timespec pdcp_proc_start, pdcp_proc_end;
 
 /*
  * Function forward deceleration
@@ -270,7 +271,7 @@ int  AddCon(int nSockFd, int Addr)
 			activeRequests[i].dbIndex = i;
 			strcpy(activeRequests[i].entity, "OAI");
 			activeRequests[i].sizeUsd =0;
-			activeRequests[i].isThisInstanceActive = true;
+//			activeRequests[i].isThisInstanceActive = true;
 			printf ("Connection established with OAI at socket %d\n\n", nSockFd);
 			//Indicate that the first buffer is being initialized and ready for usage
 			activeRequests[i].sockBufferDatabase[0].beginUsage = true;
@@ -343,7 +344,7 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 	// memorise the start address of the send buffer
 	int schedID = findCon(connectedSockFd, bufferIndex);
 	connIndex = schedID;
-	bufferCount = bufferIndex;
+//	bufferCount = bufferIndex;
 
 	if (bufferCount > MAX_BUFFER_REC_WINDOW)
 	{
@@ -351,15 +352,19 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 		exit (0);
 	}
 
-	if (activeRequests[schedID].sockBufferDatabase[bufferCount].isBufferUsed == false)
-		{
-//			temppdcpReceiveBuffer = activeRequests[schedID].sockBufferDatabase[bufferCount].pData;
-			memset(activeRequests[schedID].sockBufferDatabase[bufferCount].pData,0,BUFFER_SIZE);
-		} else
-		{
-			printf ("Serious inconsistency with the connection database buffer. Please check\n");
-			exit (0);
-		}
+	int noBuffer = 0;
+	for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
+	{
+		if (activeRequests[schedID].sockBufferDatabase[noBuffer].isBufferUsed == false)
+			{
+				bufferCount = noBuffer;
+	//			temppdcpReceiveBuffer = activeRequests[schedID].sockBufferDatabase[bufferCount].pData;
+				memset(activeRequests[schedID].sockBufferDatabase[noBuffer].pData,0,BUFFER_SIZE);
+				break;
+			}
+		printf ("Serious inconsistency with the connection database buffer. Please check\n");
+		exit (0);
+	}
 
 //	retValue = recv(connectedSockFd,temppdcpReceiveBuffer,sockExtHeaderSize,0); //LRM receives message on templrmReceiverBufer
 	retValue = recv(connectedSockFd,activeRequests[schedID].sockBufferDatabase[bufferCount].pData,sockExtHeaderSize,0); //LRM receives message on templrmReceiverBufer
@@ -389,6 +394,18 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 
 		activeRequests[schedID].sockBufferDatabase[bufferCount].msgSize = ExtRecMsg.msgSize;
 		activeRequests[schedID].msgID = ExtRecMsg.msgId;
+		activeRequests[schedID].isThisInstanceActive = true;
+		if (activeRequests[schedID].msgID == PDCP_DATA_REQ_FUNC)
+		{
+			activeRequests[schedID].isDownlink = true;
+		} else if (activeRequests[schedID].msgID == PDCP_DATA_IND)
+		{
+			activeRequests[schedID].isDownlink = false;
+		} else
+		{
+			printf ("Receive message with wrong header information. Please check\n");
+			exit (0);
+		}
 
 		 if (ExtRecMsg.msgSize)
 		 {
@@ -482,7 +499,9 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 
 			fprintf (buffer_delay,"Delay for receiving packet; %f\n", packet_delay/1000);
 #endif
-
+#ifdef freq_report
+			clock_gettime(CLOCK_MONOTONIC, &pdcp_proc_start);
+#endif
 #ifdef ROHC_COMPRESSION
 				boolean_t result;
 				uint8_t  sdu_buffer[SDU_BUFFER_SIZE];
@@ -510,7 +529,9 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 					pdcpDataReqFuncMsg.rb_id, pdcpDataReqFuncMsg.muiP, pdcpDataReqFuncMsg.confirmP,
 					pdcpDataReqFuncMsg.sdu_buffer_size, pdcpDataReqFuncMsg.buffer, pdcpDataReqFuncMsg.mode);
 #endif
-
+#ifdef freq_report
+			clock_gettime(CLOCK_MONOTONIC, &pdcp_proc_end);
+#endif
 #ifdef create_report
 /*			if (connIndex <= MAX_NO_CONN_TO_PDCP)
 			{

@@ -31,6 +31,7 @@
 
 #include "socket_msg.h"
 #include "pdcp_defense.h"
+#include "pdcp_support.h"
 
 
 extern _tSchedBuffer activeRequests[MAX_NO_CONN_TO_PDCP];
@@ -43,7 +44,8 @@ _tpdcp_defense_data pdcp_db[MAX_NO_CONN_TO_PDCP];
 //Function forward deceleration
 void activate_skipping ();
 
-int cpu_avail, down_bw_avail, up_bw_avail;
+int cpu_avail;
+double down_bw_avail, up_bw_avail;
 double mips_per_usr[MAX_NO_CONN_TO_PDCP], down_bw_per_usr[MAX_NO_CONN_TO_PDCP], up_bw_per_usr[MAX_NO_CONN_TO_PDCP];
 
 
@@ -54,10 +56,13 @@ double get_time_prio(int index)
 	struct timespec curr_time;
 	clock_gettime(CLOCK_MONOTONIC, &curr_time);
 	double temp_elapse_time = 0, elapse_time = 0;
+
+	int test = 0;
 	for (noBuffer = 0; noBuffer <MAX_BUFFER_REC_WINDOW; noBuffer++)
 	{
 		if (activeRequests[index].sockBufferDatabase[noBuffer].isBufferUsed == true)
 		{
+			test++;
 			elapse_time = (double)(curr_time.tv_sec - activeRequests[index].sockBufferDatabase[noBuffer].bufferRecTime.tv_sec)*SEC_TO_MILI +
 						(double)(curr_time.tv_nsec - activeRequests[index].sockBufferDatabase[noBuffer].bufferRecTime.tv_nsec) * NANO_TO_MILI;
 
@@ -66,8 +71,13 @@ double get_time_prio(int index)
 				temp_elapse_time = elapse_time;
 			}
 		}
-	}
 
+		if (test == MAX_BUFFER_REC_WINDOW)
+			printf("check\n");
+	}
+//the share of BBU processing is only 3 ms. For reference look modelling-computational-resources-2.pdf
+//	double time_prio = (temp_elapse_time) / 3.0;
+//	return time_prio;
 	int i;
 	for (i = 0; i<INDEX; i++)
 	{
@@ -75,28 +85,39 @@ double get_time_prio(int index)
 		{
 
 			double time_prio = (temp_elapse_time) / (double) (qci_delay[i] - CORE_TO_ENB_DELAY - MIDHAUL_DELAY - FRONTHAUL_DELAY);
+
 			return time_prio;
+
+			if (time_prio > 1 || time_prio < 0)
+				printf ("Check\n");
 		}
 	}
 
-	return -1.0;
+	return 0.0;
 }
 
 //This function scales the priority of the bearer according to 5QI table priority
-double get_qci_prio (int qci)
+double get_qci_prio (int qci, int index)
 {
-	int i, temp_prio = 0;
-	for (i = 0; i<INDEX; i++)
+	int i, j, temp_prio = 0;
+
+	for (j = 0; j <MAX_BUFFER_REC_WINDOW; j++)
 	{
-		if (qci_5g_value[i] == qci)
+		if (activeRequests[index].sockBufferDatabase[j].isBufferUsed == true)
 		{
-			temp_prio = qci_prio[i];
-			double qci_prio = ((double)(MAX_QCI_PRO - temp_prio) / (double) MAX_QCI_PRO);
-			return qci_prio;
+			for (i = 0; i<INDEX; i++)
+			{
+				if (qci_5g_value[i] == qci)
+				{
+					temp_prio = qci_prio[i];
+					double qci_prio = ((double)(MAX_QCI_PRO - temp_prio + 1) / (double) MAX_QCI_PRO + 1.0);
+					return qci_prio;
+				}
+			}
 		}
 	}
 
-	return -1.0;
+	return 0.0;
 }
 
 double get_unprocessed_bytes_prio (int index)
@@ -112,6 +133,9 @@ double get_unprocessed_bytes_prio (int index)
 	}
 
 	double prio_calc = ((double) unP_byte / (double) MAX_BUFFER_PER_BEARER);
+
+	if (prio_calc > 1 || prio_calc < 0)
+		printf ("Check\n");
 	return prio_calc;
 }
 
@@ -155,14 +179,17 @@ int defense ()
 	int noConnect;
 	for (noConnect = 0; noConnect < MAX_NO_CONN_TO_PDCP; noConnect++)
 	{
-		if (activeRequests[noConnect].isThisInstanceActive == true)
+		if (activeRequests[noConnect].sockFD != 0)
 		{
 			double timing_prio = get_time_prio(noConnect);
-			double qci_prio = get_qci_prio (activeRequests[noConnect].qci);
+			double qci_prio = get_qci_prio (activeRequests[noConnect].qci, noConnect);
 			double unscheduling_prio = get_unprocessed_bytes_prio (noConnect);
 			double utilization_prio = get_uti_prio (noConnect);
 
 			activeRequests[noConnect].prio = ((timing_prio + qci_prio + utilization_prio) / 3) * unscheduling_prio;
+
+			if (activeRequests[noConnect].prio > 2)
+				printf("Check");
 
 			pdcp_db[noConnect].dbIndex = noConnect;
 			pdcp_db[noConnect].prio = activeRequests[noConnect].prio;
@@ -210,20 +237,27 @@ void activate_skipping ()
 		}
 	}
 
+	double tem_cpu_req = total_mips_req + ARTIFICIAL_CPU_LOAD;
+	double temp_down_bw_req = current_downlink_bw + ARTIFICIAL_DOWN_BW;
+
 	for (i = 0; i < MAX_NO_CONN_TO_PDCP; i++)
 	{
-		if (activeRequests[i].isThisInstanceActive == true)
+		if (pdcp_db[i].prio > 0)
 		{
-			if ((total_mips_req > cpu_avail) || (current_downlink_bw > down_bw_avail) || (current_uplink_bw > current_uplink_bw))
+			if ((total_mips_req + ARTIFICIAL_CPU_LOAD > cpu_avail) || (current_downlink_bw + ARTIFICIAL_DOWN_BW > down_bw_avail) || (current_uplink_bw > current_uplink_bw))
 			{
 				activeRequests[pdcp_db[i].dbIndex].defense_approve = false;
 				total_mips_req = total_mips_req - mips_per_usr[pdcp_db[i].dbIndex];
 	//			total_bw_req = total_bw_req - bw_per_usr[i];
 				current_downlink_bw = current_downlink_bw - down_bw_per_usr[pdcp_db[i].dbIndex];
-				current_uplink_bw = current_uplink_bw - down_bw_per_usr[pdcp_db[i].dbIndex];
+				current_uplink_bw = current_uplink_bw - up_bw_per_usr[pdcp_db[i].dbIndex];
 			}
 		}
 	}
+
+	set_cpu_data (tem_cpu_req, (total_mips_req + ARTIFICIAL_CPU_LOAD), (double)cpu_avail);
+	set_down_bw_data (temp_down_bw_req, (current_downlink_bw + ARTIFICIAL_DOWN_BW), (double)down_bw_avail);
+	defense_report_write();
 }
 
 

@@ -43,7 +43,7 @@
 //Function deceleration
 void cldMsgHandler(UINT32 messageId, INT32 sockFd);
 void resource_req_init (INT32 sockFd);
-void resource_req_update (INT32 sockFd, int cpu_req, int down_BW_req, int up_BW_req, int querry_type);
+void resource_req_update (INT32 sockFd, int cpu_req, double  down_BW_req, double  up_BW_req, int querry_type);
 
 
 extern EXT_MSG_T ExtRecMsg;
@@ -53,7 +53,8 @@ extern double downlink_mips;
 extern double uplink_mips;
 extern double downlink_bw, uplink_bw;
 extern int meas_count_downlink, meas_count_uplink;
-extern int cpu_avail, down_bw_avail, up_bw_avail;
+extern int cpu_avail;
+extern double down_bw_avail, up_bw_avail;
 
 bool cld_reg_success;
 
@@ -145,8 +146,8 @@ void cldMsgHandler(UINT32 messageId, INT32 sockFd)
 		{
 //			res_req.res_querry_enable = 3;
 			res_req.resource_req = (int) (downlink_mips / meas_count_downlink + uplink_mips / meas_count_uplink);
-			res_req.down_BW_req = (int) (downlink_bw / meas_count_downlink);
-			res_req.up_BW_req = (int) (uplink_bw / meas_count_uplink);
+			res_req.down_BW_req = (double) (downlink_bw / meas_count_downlink);
+			res_req.up_BW_req = (double) (uplink_bw / meas_count_uplink);
 			resource_req_update (sockFd, res_req.resource_req, res_req.down_BW_req, res_req.up_BW_req, res_req.res_querry_enable);
 			downlink_mips = 0;
 			downlink_bw = 0;
@@ -180,7 +181,7 @@ void resource_req_init (INT32 sockFd)
 	execute_MsgSend(sockFd);
 }
 
-void resource_req_update (INT32 sockFd, int cpu_req, int down_BW_req, int up_BW_req, int querry_type)
+void resource_req_update (INT32 sockFd, int cpu_req, double down_BW_req, double up_BW_req, int querry_type)
 {
 	CLOUD_MANAGER_RESOURCE_HANDLE_T res_req;
 

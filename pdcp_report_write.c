@@ -53,6 +53,7 @@ FILE *pdcp_report_write;
 FILE *conect_status;
 FILE *mips_summ;
 FILE *pdcp_freq_rep;
+FILE *def_rep;
 void report () {
 //	pdcp_report_write= (FILE **) malloc(96 * sizeof(FILE*));
 	pdcp_report_write = fopen ("feeder_report.csv","w+");
@@ -110,6 +111,18 @@ void report () {
 	//This generates report about only PDCP pkt process time in term of millisecond
 	fprintf (pdcp_freq_rep, "Reference Time; Total receive cycle; Number of packet; Total processed bytes; "
 				"Total required Time for pkt process (us);\n");
+#endif
+
+#ifdef def_report
+	def_rep = fopen ("pdcp_defense_report.csv","w+");
+	setbuf(def_rep, NULL);
+	if (def_rep == NULL)
+	{
+		printf ("File not created okay, errno = %d\n", errno);
+	}
+
+	fprintf (def_rep, "CPU request ; CPU available ; CPU allocated by defense ; BW request ;"
+			"BW available ; Total BW allocated by defense \n");
 #endif
 }
 
@@ -265,4 +278,26 @@ void process_start_time_record (struct timespec start_time)
 {
 	refernce_time.tv_sec = start_time.tv_sec;
 	refernce_time.tv_nsec = start_time.tv_nsec;
+}
+
+double cpu_req, cpu_alloc, cpu_available, down_bw_req, down_bw_alloc, down_bw_available;
+
+void set_cpu_data (double req, double alloc, double avail)
+{
+	cpu_req = req;
+	cpu_alloc = alloc;
+	cpu_available = avail;
+}
+
+void set_down_bw_data (double req, double alloc, double avail)
+{
+	down_bw_req = req;
+	down_bw_alloc = alloc;
+	down_bw_available = avail;
+}
+
+void defense_report_write ()
+{
+	fprintf (def_rep,"%f ; %f; %f; %f; %f; %f\n", cpu_req, cpu_available, cpu_alloc,
+			down_bw_req, down_bw_available, down_bw_alloc);
 }

@@ -13,8 +13,14 @@
 #define SEC_TO_NANO_SECONDS  1000000000
 #define NANO_TO_MICRO  0.001
 
+#define ARTIFICIAL_CPU_LOAD 1136
+#define ARTIFICIAL_DOWN_BW 5401246126 //This value is applicable when ROHC is inactive and cpu freq is 2.1GHz
+
 double static pdcpTime_per_pkt;
 
+//Defense report
+#define def_report
+#undef def_report
 
 //Frequency analysis report
 #define freq_report
@@ -115,7 +121,9 @@ void create_pdcp_report ();
 void update_connect_status (int fd);
 void process_start_time_record (struct timespec start_time);
 void mips_report (int totalPktNo, long long int totalPktSize);
-
+void set_cpu_data (double req, double alloc, double avail);
+void set_down_bw_data (double req, double alloc, double avail);
+void defense_report_write ();
 
 
 

@@ -318,7 +318,7 @@ int findCon(int nSockFd, int bufferIndex)
 	{
 		if(activeRequests[i].sockFD ==nSockFd)//entry is there
 		{
-			if (activeRequests[i].sockBufferDatabase[bufferIndex].beginUsage == true)
+/*			if (activeRequests[i].sockBufferDatabase[bufferIndex].beginUsage == true)
 			{
 				sockfound =activeRequests[i].IPaddr;
 				activeRequests[i].sockBufferDatabase[0].pData -= sockExtHeaderSize;
@@ -326,8 +326,8 @@ int findCon(int nSockFd, int bufferIndex)
 			{
 				activeRequests[i].sockBufferDatabase[bufferIndex].beginUsage = true;
 				sockfound =activeRequests[i].IPaddr;
-			}
-
+			}*/
+			sockfound =activeRequests[i].IPaddr;
 			return i;//if an empty buffer exists for this fd use it
 		}
 
@@ -359,11 +359,14 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 			{
 				bufferCount = noBuffer;
 	//			temppdcpReceiveBuffer = activeRequests[schedID].sockBufferDatabase[bufferCount].pData;
+				activeRequests[schedID].sockBufferDatabase[bufferCount].pData -= sockExtHeaderSize;
 				memset(activeRequests[schedID].sockBufferDatabase[noBuffer].pData,0,BUFFER_SIZE);
 				break;
+			} else if (noBuffer == (MAX_BUFFER_REC_WINDOW - 1))
+			{
+				printf ("Buffer limit excited. Packet will be dropped\n");
+//				exit (0);
 			}
-		printf ("Serious inconsistency with the connection database buffer. Please check\n");
-		exit (0);
 	}
 
 //	retValue = recv(connectedSockFd,temppdcpReceiveBuffer,sockExtHeaderSize,0); //LRM receives message on templrmReceiverBufer

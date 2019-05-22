@@ -44,7 +44,7 @@
 
 
 #define defense_acrive
-//#undef defense_acrive
+#undef defense_acrive
 
 //conn_info connInfo[MAX_NO_CONN_TO_PDCP];
 
@@ -615,7 +615,7 @@ int main (INT32 argc, INT8 **argv )
 						packet_size = (int) (((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
 #ifdef ROHC_COMPRESSION
 						per_usr_mips_calc = calc_downlink_mips (packet_size, true);
-						per_usr_bw_calc = calc_downlink_mips (packet_size, true);
+						per_usr_down_bw_calc = calc_downlink_BW (packet_size, false);
 
 						current_downlink_mips += calc_downlink_mips (packet_size, true);
 						current_downlink_bw += calc_downlink_BW (packet_size, true);
@@ -638,7 +638,7 @@ int main (INT32 argc, INT8 **argv )
 						packet_size = (int) (((PDCP_DATA_IND_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);
 #ifdef ROHC_COMPRESSION
 						per_usr_mips_calc = calc_downlink_mips (packet_size, true);
-						per_usr_bw_calc = calc_downlink_mips (packet_size, true);
+						per_usr_up_bw_calc = calc_uplink_bw (packet_size, false);
 
 						current_uplink_mips += calc_uplink_mips (packet_size, true);
 						current_uplink_bw += calc_uplink_bw (packet_size, true);

@@ -344,6 +344,7 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 	// memorise the start address of the send buffer
 	int schedID = findCon(connectedSockFd, bufferIndex);
 	connIndex = schedID;
+	UINT8 *sendBuffer;
 //	bufferCount = bufferIndex;
 
 	if (bufferCount > MAX_BUFFER_REC_WINDOW)
@@ -359,7 +360,8 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 			{
 				bufferCount = noBuffer;
 	//			temppdcpReceiveBuffer = activeRequests[schedID].sockBufferDatabase[bufferCount].pData;
-				activeRequests[schedID].sockBufferDatabase[bufferCount].pData -= sockExtHeaderSize;
+				sendBuffer = activeRequests[schedID].sockBufferDatabase[noBuffer].pData;
+//				activeRequests[schedID].sockBufferDatabase[bufferCount].pData -= sockExtHeaderSize;
 				memset(activeRequests[schedID].sockBufferDatabase[noBuffer].pData,0,BUFFER_SIZE);
 				break;
 			} else if (noBuffer == (MAX_BUFFER_REC_WINDOW - 1))
@@ -369,8 +371,8 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 			}
 	}
 
-//	retValue = recv(connectedSockFd,temppdcpReceiveBuffer,sockExtHeaderSize,0); //LRM receives message on templrmReceiverBufer
-	retValue = recv(connectedSockFd,activeRequests[schedID].sockBufferDatabase[bufferCount].pData,sockExtHeaderSize,0); //LRM receives message on templrmReceiverBufer
+	retValue = recv(connectedSockFd,sendBuffer,sockExtHeaderSize,0); //LRM receives message on templrmReceiverBufer
+//	retValue = recv(connectedSockFd,activeRequests[schedID].sockBufferDatabase[bufferCount].pData,sockExtHeaderSize,0); //LRM receives message on templrmReceiverBufer
 
 	if (retValue == SYSCALLFAIL )
 	{
@@ -393,7 +395,8 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 
 		ExtRecMsg.msgId = ((EXT_MSG_T*)activeRequests[schedID].sockBufferDatabase[bufferCount].pData)->msgId;
 		ExtRecMsg.msgSize = ((EXT_MSG_T*)activeRequests[schedID].sockBufferDatabase[bufferCount].pData)->msgSize;
-		activeRequests[schedID].sockBufferDatabase[bufferCount].pData += sockExtHeaderSize;
+//		activeRequests[schedID].sockBufferDatabase[bufferCount].pData += sockExtHeaderSize;
+		sendBuffer += sockExtHeaderSize;
 
 		activeRequests[schedID].sockBufferDatabase[bufferCount].msgSize = ExtRecMsg.msgSize;
 		activeRequests[schedID].msgID = ExtRecMsg.msgId;
@@ -412,8 +415,8 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 
 		 if (ExtRecMsg.msgSize)
 		 {
-			 retValue = recv(connectedSockFd,activeRequests[schedID].sockBufferDatabase[bufferCount].pData, ExtRecMsg.msgSize, 0);
-//			 retValue = recv(connectedSockFd,temppdcpReceiveBuffer, ExtRecMsg.msgSize, 0);
+//			 retValue = recv(connectedSockFd,activeRequests[schedID].sockBufferDatabase[bufferCount].pData, ExtRecMsg.msgSize, 0);
+			 retValue = recv(connectedSockFd,sendBuffer, ExtRecMsg.msgSize, 0);
 			 if (retValue == SYSCALLFAIL )
 			 {
 				 perror("recv2");
@@ -421,6 +424,7 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 			 }
 			 activeRequests[schedID].sockBufferDatabase[bufferCount].isBufferUsed = true;
 			 clock_gettime(CLOCK_MONOTONIC, &activeRequests[schedID].sockBufferDatabase[bufferCount].bufferRecTime);
+			 activeRequests[schedID].sockBufferDatabase[bufferCount].pData += ((sizeof(ExtRecMsg.msgId))+ (sizeof(ExtRecMsg.msgSize)));
 			 activeRequests[schedID].total_bytes_rec += ((PDCP_DATA_REQ_FUNC_T*)activeRequests[schedID].sockBufferDatabase[bufferCount].pData)->sdu_buffer_size;
 		 }
 
@@ -472,26 +476,13 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 			{
 				memcpy(&pdcpDataReqFuncMsg,activeRequests[db_index].sockBufferDatabase[buffer_index].pData,
 						activeRequests[db_index].sockBufferDatabase[buffer_index].msgSize);
+				activeRequests[db_index].sockBufferDatabase[buffer_index].pData =
+						activeRequests[db_index].sockBufferDatabase[buffer_index].pData - (sizeof(UINT32) + sizeof(UINT32));
 			} else
 			{
 				printf ("Either the database or buffer index is wrong. Exiting the program");
 				exit (0);
 			}
-
-
-/*			if (connInfo[connIndex].socID == -99)
-			{
-				connInfo[connIndex].socID = sockFd;
-				connInfo[connIndex].bearerID = pdcpDataReqFuncMsg.rb_id;
-				connInfo[connIndex].pdcpInsID = connIndex;
-				connInfo[connIndex].dataDirection = pdcpDataReqFuncMsg.ctxt_pP.enb_flag;  //If 0 then dataflow uplink direction elseIF 1 downlink direction
-			}*/
-
-/*			if (pdcpDataReqFuncMsg.rohc_packet.len > 60 || pdcpDataReqFuncMsg.sdu_buffer_size > 2000)
-			{
-				printf ("Check");
-			}*/
-
 
 			total_processed_bytes += pdcpDataReqFuncMsg.sdu_buffer_size;
 
@@ -550,32 +541,9 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 			pdcpDataReqFuncMsg.pdcp_result = result;
 			pdcpDataReqFuncMsg.pdcp_pdu_size = pdcp_pdu_size;
 			pdcpDataReqFuncMsg.sdu_buffer_size = pdcp_pdu_size;
-//			pdcpDataReqFuncMsg.pdcp_pdu.pool_id = *(pdcp_pdu_p->pool_id);
-//			memcpy(pdcpDataReqFuncMsg.pdcp_pdu.pool_id,pdcp_pdu_p->pool_id, sizeof (unsigned char));
-//			pdcpDataReqFuncMsg.pdcp_pdu.data = *pdcp_pdu_p->data;
-//			memcpy(pdcpDataReqFuncMsg.pdcp_pdu.data,pdcp_pdu_p->data, pdcpDataReqFuncMsg.pdcp_pdu_size);
-//			memcpy(pdcpDataReqFuncMsg.pdcp_pdu,pdcp_pdu_p, pdcpDataReqFuncMsg.pdcp_pdu_size);
 
-
-//			int mem_block_alam_size = 2 * sizeof (mem_block_alam) + sizeof (unsigned char ) +
-//					(SDU_BUFFER_SIZE + MAX_PDCP_HEADER_TRAILER_SIZE) * sizeof (unsigned char );
-/*			int mem_block_alam_size = sizeof (unsigned char ) +	(SDU_BUFFER_SIZE + MAX_PDCP_HEADER_SIZE + MAX_PDCP_TAILER_SIZE) * sizeof (unsigned char );
-			int msgSize = sizeof (protocol_ctxt_t) + sizeof (srb_flag_t) + sizeof (rb_id_t) + sizeof (mui_t) +
-					sizeof (confirm_t) + sizeof (sdu_size_t) + pdcpDataReqFuncMsg.sdu_buffer_size +
-					sizeof (pdcp_transmission_mode_t) + sizeof (uint16_t) + mem_block_alam_size + sizeof (boolean_t);
-
-			int tstSize = sizeof (PDCP_DATA_REQ_FUNC_T);*/
-
-//			responseBufferSize = sizeof (UINT32) + sizeof (UINT32) + msgSize;
-//			responseBufferSize = sizeof (UINT32) + sizeof (UINT32) + tstSize;
-
-//			MsgInsertFunc (PDCP_DATA_REQ_FUNC, sizeof (PDCP_DATA_REQ_FUNC_T), &pdcpDataReqFuncMsg, &temppdcpSendBuffer);
-//			MsgSend (sockFd);
-
-/*			if (pdcpDataReqFuncMsg.rohc_packet.len > 60 || pdcpDataReqFuncMsg.sdu_buffer_size > 2000)
-			{
-				printf ("Check");
-			}*/
+			MsgInsertFunc (PDCP_DATA_REQ_FUNC, sizeof (PDCP_DATA_REQ_FUNC_T), &pdcpDataReqFuncMsg, &temppdcpSendBuffer);
+			MsgSend (sockFd);
 		}
 
 		break;
@@ -607,6 +575,8 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 			{
 				memcpy(&pdcpDataIndMsg,activeRequests[db_index].sockBufferDatabase[buffer_index].pData,
 						activeRequests[db_index].sockBufferDatabase[buffer_index].msgSize);
+				activeRequests[db_index].sockBufferDatabase[buffer_index].pData =
+										activeRequests[db_index].sockBufferDatabase[buffer_index].pData - (sizeof(UINT32) + sizeof(UINT32));
 			} else
 			{
 				printf ("Either the database or buffer index is wrong. Exiting the program");
@@ -624,9 +594,13 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 			//Be careful. If PDCP is running on both downlink and uplink mode, disable this calculation from one side
 			total_processed_bytes += pdcpDataIndMsg.sdu_buffer_size;
 
+#ifdef freq_report
+			clock_gettime(CLOCK_MONOTONIC, &pdcp_proc_start);
+#endif
+
 #ifdef ROHC_COMPRESSION							//Here this def is used for ROHC decompression
 				boolean_t result;
-				uint8_t  sdu_buffer[SDU_BUFFER_SIZE];
+//				uint8_t  sdu_buffer[SDU_BUFFER_SIZE];
 //				memcpy (sdu_buffer, &pdcpDataIndMsg.rohc_packet.dataBuffer, pdcpDataIndMsg.sdu_buffer_size);
 			int tempPacketLength = pdcpDataIndMsg.rohc_packet.len;
 			rohc_decompmain(decompressor[db_index]);
@@ -643,6 +617,10 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 #else
 			boolean_t result = pdcp_data_ind_uplink (db_index, &pdcpDataIndMsg.ctxt_pP, pdcpDataIndMsg.srb_flagP,
 					pdcpDataIndMsg.MBMS_flagP, pdcpDataIndMsg.rb_id, pdcpDataIndMsg.sdu_buffer_size, pdcpDataIndMsg.buffer);
+#endif
+
+#ifdef freq_report
+			clock_gettime(CLOCK_MONOTONIC, &pdcp_proc_end);
 #endif
 
 #ifdef create_uplink_report

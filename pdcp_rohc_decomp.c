@@ -275,6 +275,8 @@ static bool rohc_decompression(struct rohc_decomp *const decompressor, const str
 #ifdef create_uplink_report
 			clock_gettime(CLOCK_MONOTONIC, &rohc_uplink_start);
 #endif
+//			if (decompressor->target_mode == 0)
+//				printf ("CHeck");
 	status = rohc_decompress3(decompressor, comp_packet, &ip_packet, &rcvd_feedback, &feedback_send);
 
 #ifdef create_uplink_report

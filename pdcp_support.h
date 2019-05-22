@@ -16,6 +16,9 @@
 #define ARTIFICIAL_CPU_LOAD 1136
 #define ARTIFICIAL_DOWN_BW 5401246126 //This value is applicable when ROHC is inactive and cpu freq is 2.1GHz
 
+#define TRAFFIC_MODEL_ENABLE
+#undef TRAFFIC_MODEL_ENABLE
+
 double static pdcpTime_per_pkt;
 
 //Defense report
@@ -24,7 +27,7 @@ double static pdcpTime_per_pkt;
 
 //Frequency analysis report
 #define freq_report
-#undef freq_report
+//#undef freq_report
 
 //This macro enable all the measurements and initialize prepare reports
 #define create_report

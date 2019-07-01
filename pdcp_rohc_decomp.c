@@ -133,12 +133,14 @@ int rohc_decompmain(struct rohc_decomp *const decompressor)
 	memset (&ip_buffer, 0, ROHC_BUFFER_SIZE);
 	struct rohc_buf ip_packet = rohc_buf_init_empty(ip_buffer, ROHC_BUFFER_SIZE);
 #ifndef create_report
+#ifndef freq_report
 //! [define random callback 1]
 	unsigned int seed;
 
 	/* initialize the random generator */
 	seed = time(NULL);
 	srand(seed);
+#endif
 #endif
 
 	ip_packet.len = pdcpDataIndMsg.rohc_packet.len;
@@ -269,7 +271,9 @@ static bool rohc_decompression(struct rohc_decomp *const decompressor, const str
 
 	/* then, compress the fake IP/UDP/RTP packet with the RTP profile */
 #ifndef create_report
+#ifndef freq_report
 	printf("\ndecompress the IP/UDP/RTP packet\n");
+#endif
 #endif
 
 #ifdef create_uplink_report

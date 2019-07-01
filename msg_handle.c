@@ -96,25 +96,27 @@ void buffer_read_delay_report ()
 }
 #endif
 
-/*FILE ** write_report;// = (FILE **) malloc(96 * sizeof(FILE*));
-void prepare_file_for_report ()
+UINT32 header_msg_size ()
 {
-	write_report= (FILE **) malloc(96 * sizeof(FILE*));
-	int i;
-	for (i = 0; i<MAX_NO_CONN_TO_PDCP; i++)
-	{
-	    char buf[1024];
+	EXT_MSG_T socketMsg;
+	UINT32	skt_headerSize = sizeof(socketMsg.msgId) + sizeof (socketMsg.msgSize);
 
-	    // now we build the file name
-	    strcpy(buf, REPORT_NAME);
-	    sprintf(buf+29,"_%03d", i+1);
-	    strcat(buf, ".csv");
+	return skt_headerSize;
+}
 
-	    // open file
-	    write_report[i] = fopen(buf, "w+");
-	}
+//Add socket msg header size with the buffer address to get the data
+void header_add (int database_index, int buff_index)
+{
+	UINT32 skt_headerSize = header_msg_size();
+	activeRequests[database_index].sockBufferDatabase[buff_index].pData += skt_headerSize;
+}
 
-}*/
+//Remove socket msg header size from the buffer address to initialize
+void header_rem (int database_index, int buff_index)
+{
+	UINT32 skt_headerSize = header_msg_size();
+	activeRequests[database_index].sockBufferDatabase[buff_index].pData -= skt_headerSize;
+}
 
 void report_init ()
 {
@@ -274,7 +276,7 @@ int  AddCon(int nSockFd, int Addr)
 //			activeRequests[i].isThisInstanceActive = true;
 			printf ("Connection established with OAI at socket %d\n\n", nSockFd);
 			//Indicate that the first buffer is being initialized and ready for usage
-			activeRequests[i].sockBufferDatabase[0].beginUsage = true;
+//			activeRequests[i].sockBufferDatabase[0].beginUsage = true;
 
 #ifdef ROHC_COMPRESSION
 			/* create a ROHC compressor with small CIDs and the largest MAX_CID
@@ -424,8 +426,11 @@ VOID MsgReceive(INT32 connectedSockFd, int bufferIndex)
 			 }
 			 activeRequests[schedID].sockBufferDatabase[bufferCount].isBufferUsed = true;
 			 clock_gettime(CLOCK_MONOTONIC, &activeRequests[schedID].sockBufferDatabase[bufferCount].bufferRecTime);
-			 activeRequests[schedID].sockBufferDatabase[bufferCount].pData += ((sizeof(ExtRecMsg.msgId))+ (sizeof(ExtRecMsg.msgSize)));
+//			 activeRequests[schedID].sockBufferDatabase[bufferCount].pData += ((sizeof(ExtRecMsg.msgId))+ (sizeof(ExtRecMsg.msgSize)));
+			 header_add (schedID, bufferCount);
 			 activeRequests[schedID].total_bytes_rec += ((PDCP_DATA_REQ_FUNC_T*)activeRequests[schedID].sockBufferDatabase[bufferCount].pData)->sdu_buffer_size;
+//			 activeRequests[schedID].sockBufferDatabase[bufferCount].pData -= ((sizeof(ExtRecMsg.msgId))+ (sizeof(ExtRecMsg.msgSize)));
+			 header_rem (schedID, bufferCount);
 		 }
 
 //		 // call message handler here
@@ -474,10 +479,13 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 			if (db_index !=-1 && buffer_index !=-1 &&
 					activeRequests[db_index].sockBufferDatabase[buffer_index].isBufferUsed == true)
 			{
+				header_add (db_index, buffer_index);
+//				 activeRequests[db_index].sockBufferDatabase[buffer_index].pData += ((sizeof(ExtRecMsg.msgId))+ (sizeof(ExtRecMsg.msgSize)));
 				memcpy(&pdcpDataReqFuncMsg,activeRequests[db_index].sockBufferDatabase[buffer_index].pData,
 						activeRequests[db_index].sockBufferDatabase[buffer_index].msgSize);
-				activeRequests[db_index].sockBufferDatabase[buffer_index].pData =
-						activeRequests[db_index].sockBufferDatabase[buffer_index].pData - (sizeof(UINT32) + sizeof(UINT32));
+//				activeRequests[db_index].sockBufferDatabase[buffer_index].pData =
+//						activeRequests[db_index].sockBufferDatabase[buffer_index].pData - (sizeof(UINT32) + sizeof(UINT32));
+				header_rem (db_index, buffer_index);
 			} else
 			{
 				printf ("Either the database or buffer index is wrong. Exiting the program");
@@ -485,6 +493,7 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 			}
 
 			total_processed_bytes += pdcpDataReqFuncMsg.sdu_buffer_size;
+
 
 #ifdef BUFFER_READ_DELAY_REPORT
 			clock_gettime(CLOCK_MONOTONIC, &packet_rec);
@@ -542,8 +551,8 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 			pdcpDataReqFuncMsg.pdcp_pdu_size = pdcp_pdu_size;
 			pdcpDataReqFuncMsg.sdu_buffer_size = pdcp_pdu_size;
 
-			MsgInsertFunc (PDCP_DATA_REQ_FUNC, sizeof (PDCP_DATA_REQ_FUNC_T), &pdcpDataReqFuncMsg, &temppdcpSendBuffer);
-			MsgSend (sockFd);
+//			MsgInsertFunc (PDCP_DATA_REQ_FUNC, sizeof (PDCP_DATA_REQ_FUNC_T), &pdcpDataReqFuncMsg, &temppdcpSendBuffer);
+//			MsgSend (sockFd);
 		}
 
 		break;
@@ -573,10 +582,10 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 
 			if (db_index !=-1 && buffer_index !=-1)
 			{
+				header_add (db_index, buffer_index);
 				memcpy(&pdcpDataIndMsg,activeRequests[db_index].sockBufferDatabase[buffer_index].pData,
 						activeRequests[db_index].sockBufferDatabase[buffer_index].msgSize);
-				activeRequests[db_index].sockBufferDatabase[buffer_index].pData =
-										activeRequests[db_index].sockBufferDatabase[buffer_index].pData - (sizeof(UINT32) + sizeof(UINT32));
+				header_rem (db_index, buffer_index);
 			} else
 			{
 				printf ("Either the database or buffer index is wrong. Exiting the program");
@@ -607,7 +616,9 @@ static VOID MsgHandler(UINT32 messageId, INT32 sockFd)
 
 			int ROHC_recover = pdcpDataIndMsg.rohc_packet.len - tempPacketLength;
 
-			pdcpDataIndMsg.sdu_buffer_size = pdcpDataIndMsg.sdu_buffer_size + ROHC_recover;
+//We need to process less number of bytes for decryption. So we don't need add the revived bytes from
+//ROHC to the original buffer size
+//			pdcpDataIndMsg.sdu_buffer_size = pdcpDataIndMsg.sdu_buffer_size + ROHC_recover;
 
 /*			result = pdcp_data_ind_uplink (db_index, &pdcpDataIndMsg.ctxt_pP, pdcpDataIndMsg.srb_flagP,
 					pdcpDataIndMsg.MBMS_flagP, pdcpDataIndMsg.rb_id, pdcpDataIndMsg.sdu_buffer_size, sdu_buffer);*/

@@ -228,7 +228,10 @@ pdcp_data_ind_uplink(
 			sequencing_time_uplink = (double)(seq_uplink_end.tv_sec - seq_uplink_start.tv_sec)*SEC_TO_NANO_SECONDS +
 					(double)(seq_uplink_end.tv_nsec - seq_uplink_start.tv_nsec);
 #endif
+
+#ifndef freq_report
       printf ("\nSequence number %d verified\n", sequence_number);
+#endif
     } else {
       LOG_W(PDCP,
             PROTOCOL_PDCP_CTXT_FMT"Incoming PDU has an unexpected sequence number (%d), RX window synchronisation have probably been lost!\n",

@@ -43,8 +43,8 @@
 #include "socket_msg.h"
 
 
-#define defense_acrive
-#undef defense_acrive
+#define defense_active
+//#undef defense_active
 
 //conn_info connInfo[MAX_NO_CONN_TO_PDCP];
 
@@ -518,6 +518,7 @@ int main (INT32 argc, INT8 **argv )
 	  double timePerPacket, timePerProc;
 	  bool start_report = false;
 	  cld_reg (gConnectSockFd);
+	  init_qci_db ();
 	  clock_gettime(CLOCK_MONOTONIC, &monitoring_window_start);
 	while (TRUE)
 	{
@@ -598,7 +599,7 @@ int main (INT32 argc, INT8 **argv )
 		int packet_size = 0;
 		double per_usr_mips_calc = 0, per_usr_down_bw_calc = 0, per_usr_up_bw_calc = 0;
 		current_downlink_mips = 0, current_downlink_bw = 0, current_uplink_mips = 0, current_uplink_bw = 0;
-#ifdef defense_acrive
+#ifdef defense_active
 		  for (noConect = 0; noConect < MAX_NO_CONN_TO_PDCP; noConect++)
 		  {
 			  per_usr_mips_calc = 0, per_usr_down_bw_calc = 0, per_usr_up_bw_calc = 0;
@@ -609,7 +610,9 @@ int main (INT32 argc, INT8 **argv )
 					if (activeRequests[noConect].msgID == PDCP_DATA_REQ_FUNC)
 					{
 						//Downlink CPU consumption calculation
+						header_add (noConect, noBuffer);
 						activeRequests[noConect].qci = (int) (((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->qci);
+						header_rem (noConect, noBuffer);
 
 						meas_count_downlink++;
 						packet_size = (int) (((PDCP_DATA_REQ_FUNC_T*)activeRequests[noConect].sockBufferDatabase[noBuffer].pData)->sdu_buffer_size);

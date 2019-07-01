@@ -21,13 +21,13 @@
 
 double static pdcpTime_per_pkt;
 
-//Defense report
+//Defense general report
 #define def_report
 #undef def_report
 
 //Frequency analysis report
 #define freq_report
-//#undef freq_report
+#undef freq_report
 
 //This macro enable all the measurements and initialize prepare reports
 #define create_report
@@ -46,8 +46,13 @@ double static pdcpTime_per_pkt;
 #define mips_sum_report
 #undef mips_sum_report
 
+//Creates detailed report for uplink
 #define create_uplink_report
 #undef create_uplink_report
+
+//Creates report for a user specific priority change
+#define usr_prio_report
+//#undef usr_prio_report
 
 #ifdef create_report
 #define REPORT_NAME "pdcp_downlink_report_socket"
@@ -127,7 +132,11 @@ void mips_report (int totalPktNo, long long int totalPktSize);
 void set_cpu_data (double req, double alloc, double avail);
 void set_down_bw_data (double req, double alloc, double avail);
 void defense_report_write ();
-
+void set_usr_prio_data (int bearer_db, double qci, double utilization, double unschedule, double total);
+void user_prio_write ();
+void header_add (int database_index, int buff_index);
+void header_rem (int database_index, int buff_index);
+void init_qci_db ();
 
 
 

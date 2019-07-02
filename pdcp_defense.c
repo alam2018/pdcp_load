@@ -45,7 +45,7 @@ _tpdcp_defense_data pdcp_db[MAX_NO_CONN_TO_PDCP];
 void activate_skipping ();
 double get_time_prio(int index, bool returnElapseTime);
 
-int cpu_avail;
+double cpu_avail;
 double down_bw_avail, up_bw_avail;
 double mips_per_usr[MAX_NO_CONN_TO_PDCP], down_bw_per_usr[MAX_NO_CONN_TO_PDCP], up_bw_per_usr[MAX_NO_CONN_TO_PDCP];
 
@@ -63,9 +63,18 @@ the share of BBU processing is only 3 ms. For reference look modelling-computati
 */
 
 bool allowPktProcessingNextCycle [MAX_NO_CONN_TO_PDCP];
-#define X_HAUL_Time					41.1
-#define BASEBAND_PROCESS_TIME 		3
+#define X_HAUL_Time					41.1	//CORE_TO_ENB_DELAY + MIDHAUL_DELAY + FRONTHAUL_DELAY. For these values look at Overview_of_MEF_22.2 and 3GPP TS 23.203 v16.0.0
+#define BASEBAND_PROCESS_TIME 		3		//the share of BBU processing is only 3 ms. For reference look modelling-computational-resources-2.pdf
 #define TOTAL_DELAY_FOR_NEXT_PKT	44.1
+
+//This function scales the priority of the bearer according to 5QI table priority
+typedef struct qci_db {
+	int qci_prio;    		//Actual bearer priority from 5QI table
+	double calc_prio;		//Related priority calculated in defense
+	int qci_delay_budget;	//The PDB defined in the 5QI table
+}_tqci_db;
+
+_tqci_db stored_qci_prio [MAX_NO_CONN_TO_PDCP];
 
 bool check_timeAvailability (int index)
 {
@@ -73,15 +82,15 @@ bool check_timeAvailability (int index)
 	double maxElapesTime = get_time_prio (index, true);  //Get the result in ms
 	double totalRequiredTime = maxElapesTime + TOTAL_DELAY_FOR_NEXT_PKT;
 
-	int i;
-	double pkt_delay_budget;
-	for (i = 0; i<INDEX; i++)
+//	int i;
+	double pkt_delay_budget = stored_qci_prio[index].qci_delay_budget;
+/*	for (i = 0; i<INDEX; i++)
 	{
 		if (qci_5g_value[i] == activeRequests[index].qci)
 		{
 			pkt_delay_budget = (double) qci_delay[i];
 		}
-	}
+	}*/
 
 	if (totalRequiredTime > pkt_delay_budget)
 	{
@@ -138,20 +147,14 @@ double get_time_prio(int index, bool returnElapseTime)
 			return time_prio;
 
 			if (time_prio > 1 || time_prio < 0)
-				printf ("Check\n");
+				printf ("Check time priority\n");
 		}
 	}
 
 	return 0.0;
 }
 
-//This function scales the priority of the bearer according to 5QI table priority
-typedef struct qci_db {
-	int qci_prio;    	//Actual bearer priority from 5QI table
-	double calc_prio;	//Related priority calculated in defense
-}_tqci_db;
 
-_tqci_db stored_qci_prio [MAX_NO_CONN_TO_PDCP];
 double get_qci_prio (int qci, int index)
 {
 	int i, temp_prio = 0;
@@ -183,6 +186,7 @@ double get_qci_prio (int qci, int index)
 			{
 				temp_prio = qci_prio[i];
 				stored_qci_prio[index].qci_prio = temp_prio;
+				stored_qci_prio[index].qci_delay_budget = qci_delay[i];
 				double related_qci_prio = ((double)(MAX_QCI_PRO - temp_prio + 1) / (double) (MAX_QCI_PRO + 1.0));
 				stored_qci_prio[index].calc_prio = related_qci_prio;
 				return related_qci_prio;
@@ -190,6 +194,7 @@ double get_qci_prio (int qci, int index)
 		}
 	}
 
+	printf ("Check qci priority\n");
 	return 0.0;
 }
 
@@ -208,7 +213,7 @@ double get_unprocessed_bytes_prio (int index)
 	double prio_calc = ((double) unP_byte / (double) MAX_BUFFER_PER_BEARER);
 
 	if (prio_calc > 1 || prio_calc < 0)
-		printf ("Check\n");
+		printf ("Check unprocessed bytes priority\n");
 	return prio_calc;
 }
 
@@ -225,7 +230,7 @@ void get_CPU_process_bytes_Downlink ()
 double get_uti_prio (int index)
 {
 	double utilization_prio = 0;
-	int cpu_capacity = MAX_CPU_CAPACITY;
+	int cpu_capacity;// = MAX_CPU_CAPACITY;
 
 	if (activeRequests[index].isDownlink == true)
 	{
@@ -238,7 +243,7 @@ double get_uti_prio (int index)
 	{
 		//TODO design for uplink
 	}
-	utilization_prio =  ((double)activeRequests[index].total_bytes_rec / (double)cpu_capacity);
+	utilization_prio =  (double)(activeRequests[index].total_bytes_rec / cpu_capacity);
 
 	double dummy_multiConnectivity_multicast_prio = 1;  //TODO when multi-connectivity is added to the traffic generator for the evaluation, we need proper prio calculation here
 
@@ -251,9 +256,15 @@ bool usr_present = false;
 bool selectstop = false;
 int rand_count = -1;
 #endif
+extern int drb_req, drb_dropped;
 
+//The actual defense activity starts from here
 int defense ()
 {
+#ifdef defense_time_report
+	struct timespec def_start, def_end;
+	clock_gettime(CLOCK_MONOTONIC, &def_start);
+#endif
 	//First we need to prioritize all the bearers
 	int noConnect;
 
@@ -261,6 +272,7 @@ int defense ()
 	{
 		if ((activeRequests[noConnect].sockFD != 0) && (activeRequests[noConnect].isThisInstanceActive == true))
 		{
+			drb_req++;
 #ifdef usr_prio_report
 			if ((selectstop == false) && (noConnect == 10))
 			{
@@ -296,6 +308,15 @@ int defense ()
 
 
 	activate_skipping ();
+
+#ifdef defense_time_report
+	clock_gettime(CLOCK_MONOTONIC, &def_end);
+
+	double timePerDef = (double)(def_end.tv_sec - def_start.tv_sec)*SEC_TO_NANO_SECONDS +
+			(double)(def_end.tv_nsec - def_start.tv_nsec);
+
+	defense_timming_report_write (timePerDef);
+#endif
 
 	return 0;
 }
@@ -336,7 +357,7 @@ void activate_skipping ()
 	}
 
 	double tem_cpu_req = total_mips_req + ARTIFICIAL_CPU_LOAD;
-	double temp_down_bw_req = current_downlink_bw + ARTIFICIAL_DOWN_BW;
+//	double temp_down_bw_req = current_downlink_bw + ARTIFICIAL_DOWN_BW;
 
 	for (i = 0; i < MAX_NO_CONN_TO_PDCP; i++)
 	{
@@ -346,6 +367,7 @@ void activate_skipping ()
 			if (((total_mips_req + ARTIFICIAL_CPU_LOAD > cpu_avail) || (current_downlink_bw + ARTIFICIAL_DOWN_BW > down_bw_avail)
 					|| (current_uplink_bw > current_uplink_bw)) && (allowPktProcessingNextCycle == true))
 			{
+				drb_dropped++;
 				activeRequests[pdcp_db[i].dbIndex].defense_approve = false;
 				total_mips_req = total_mips_req - mips_per_usr[pdcp_db[i].dbIndex];
 	//			total_bw_req = total_bw_req - bw_per_usr[i];
@@ -355,8 +377,11 @@ void activate_skipping ()
 		}
 	}
 
+#if defined (def_report) || defined (defense_time_report)
+	set_cpu_data (tem_cpu_req, (total_mips_req + ARTIFICIAL_CPU_LOAD), cpu_avail);
+#endif
+
 #ifdef def_report
-	set_cpu_data (tem_cpu_req, (total_mips_req + ARTIFICIAL_CPU_LOAD), (double)cpu_avail);
 	set_down_bw_data (temp_down_bw_req, (current_downlink_bw + ARTIFICIAL_DOWN_BW), (double)down_bw_avail);
 	defense_report_write();
 #endif
@@ -370,7 +395,7 @@ void activate_skipping ()
 #endif
 }
 
-init_qci_db ()
+void init_qci_db ()
 {
 	int i;
 	for (i = 0; i < MAX_NO_CONN_TO_PDCP; i++)

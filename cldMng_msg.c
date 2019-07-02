@@ -53,7 +53,7 @@ extern double downlink_mips;
 extern double uplink_mips;
 extern double downlink_bw, uplink_bw;
 extern int meas_count_downlink, meas_count_uplink;
-extern int cpu_avail;
+extern double cpu_avail;
 extern double down_bw_avail, up_bw_avail;
 
 bool cld_reg_success;

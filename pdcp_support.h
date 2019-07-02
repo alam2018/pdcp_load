@@ -13,8 +13,10 @@
 #define SEC_TO_NANO_SECONDS  1000000000
 #define NANO_TO_MICRO  0.001
 
-#define ARTIFICIAL_CPU_LOAD 1136
-#define ARTIFICIAL_DOWN_BW 5401246126 //This value is applicable when ROHC is inactive and cpu freq is 2.1GHz
+//#define ARTIFICIAL_CPU_LOAD 1136
+#define ARTIFICIAL_CPU_LOAD 0
+//#define ARTIFICIAL_DOWN_BW 5401246126 //This value is applicable when ROHC is inactive and cpu freq is 2.1GHz
+#define ARTIFICIAL_DOWN_BW 0
 
 #define TRAFFIC_MODEL_ENABLE
 #undef TRAFFIC_MODEL_ENABLE
@@ -52,7 +54,11 @@ double static pdcpTime_per_pkt;
 
 //Creates report for a user specific priority change
 #define usr_prio_report
-//#undef usr_prio_report
+#undef usr_prio_report
+
+//Create report about defense algorithm time consumption
+#define defense_time_report
+//#undef defense_time_report
 
 #ifdef create_report
 #define REPORT_NAME "pdcp_downlink_report_socket"
@@ -137,7 +143,7 @@ void user_prio_write ();
 void header_add (int database_index, int buff_index);
 void header_rem (int database_index, int buff_index);
 void init_qci_db ();
-
+void defense_timming_report_write (double def_timing);
 
 
 #endif /* PDCP_SUPPORT_H_ */

@@ -256,7 +256,7 @@ void set_txt_inp (int countLine, char *val)
 //double downlink_bw, uplink_bw;
 double downlink_mips = 0, uplink_mips = 0, downlink_bw = 0, uplink_bw = 0;
 int meas_count_downlink = 0, meas_count_uplink = 0;
-extern int cpu_avail;
+extern double cpu_avail;
 extern double down_bw_avail, up_bw_avail;
 //long int processed_bytes_in_window[MAX_NO_CONN_TO_PDCP];
 extern double mips_per_usr[MAX_NO_CONN_TO_PDCP], down_bw_per_usr[MAX_NO_CONN_TO_PDCP], up_bw_per_usr[MAX_NO_CONN_TO_PDCP];
@@ -673,6 +673,8 @@ int main (INT32 argc, INT8 **argv )
 				  ((current_downlink_bw+ARTIFICIAL_DOWN_BW) > down_bw_avail) ||
 				  (current_uplink_bw > current_uplink_bw)) && (total_mips_req > 0))
 		  {
+			  if (cpu_avail == 0)
+				  printf ("check");
 			  defense ();
 		  }
 

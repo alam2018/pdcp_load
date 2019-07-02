@@ -55,6 +55,7 @@ FILE *mips_summ;
 FILE *pdcp_freq_rep;
 FILE *def_rep;
 FILE *usr_prio;
+FILE *defense_time;
 void report () {
 //	pdcp_report_write= (FILE **) malloc(96 * sizeof(FILE*));
 	pdcp_report_write = fopen ("feeder_report.csv","w+");
@@ -136,6 +137,19 @@ void report () {
 
 	fprintf (usr_prio, "Bearer ID; QCI priority; Utilization priority; Unscheduling priority; Total priority \n");
 #endif
+
+#ifdef defense_time_report
+	defense_time = fopen ("defense_time_report.csv","w+");
+	setbuf(defense_time, NULL);
+	if (defense_time == NULL)
+	{
+	printf ("File not created okay, errno = %d\n", errno);
+	}
+
+	fprintf (defense_time, "Number of Bearer processing request; Total CPU Request (DMIPS); Available CPU (DMIPS); "
+			"Allocated CPU (DMIPS); Number of Dropped Bearer;  Defense Time (ns)\n");
+#endif
+
 }
 
 
@@ -314,7 +328,8 @@ void defense_report_write ()
 			down_bw_req, down_bw_available, down_bw_alloc);
 }
 
-double usr_qci_prio = 0, utilization_prio = 0, unschedule_prio = 0, total_prio = 0; bearer_db = 0;
+double usr_qci_prio = 0, utilization_prio = 0, unschedule_prio = 0, total_prio = 0;
+int bearer_db = 0;
 
 void set_usr_prio_data (int bearer_index, double qci, double utilization, double unschedule, double total)
 {
@@ -333,4 +348,13 @@ void user_prio_write ()
 	if (usr_qci_prio == 0)
 		printf ("check");
 	fprintf (usr_prio,"%d ; %f; %f; %f; %f\n", bearer_db, usr_qci_prio, utilization_prio, unschedule_prio, total_prio);
+}
+
+int drb_req = 0, drb_dropped = 0;
+
+void defense_timming_report_write (double def_timing)
+{
+	fprintf (defense_time,"%d ; %f; %f; %f; %d; %f\n", drb_req, cpu_req, cpu_available, cpu_alloc, drb_dropped, def_timing);
+	drb_req = 0;
+	drb_dropped = 0;
 }

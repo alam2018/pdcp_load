@@ -669,12 +669,12 @@ int main (INT32 argc, INT8 **argv )
 		  total_mips_req = current_downlink_mips + current_uplink_mips;
 		  total_bw_req = current_downlink_bw + current_uplink_bw;
 
+		  //From cloud manager allocate CPU and BW which is greater than the Artificial load. Otherwise there will be error in
+		  //defense general nad timing report
 		  if (((total_mips_req + ARTIFICIAL_CPU_LOAD > cpu_avail) ||
 				  ((current_downlink_bw+ARTIFICIAL_DOWN_BW) > down_bw_avail) ||
 				  (current_uplink_bw > current_uplink_bw)) && (total_mips_req > 0))
 		  {
-			  if (cpu_avail == 0)
-				  printf ("check");
 			  defense ();
 		  }
 
